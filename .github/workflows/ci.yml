@@ -1,7 +1,9 @@
 name: CI
 
+# Checks every branch push and pull request. Version tags are built by release.yml instead.
 on:
   push:
+    branches: ['**']
   pull_request:
 
 permissions:

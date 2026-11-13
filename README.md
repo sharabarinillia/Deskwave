@@ -116,6 +116,9 @@ Every release has these files under **Assets**:
 | [Deskwave-Windows.zip](https://github.com/sharabarinillia/Deskwave/releases/latest/download/Deskwave-Windows.zip) | Both installers in clearly named folders, with a READ ME FIRST file. |
 | [SHA256SUMS.txt](https://github.com/sharabarinillia/Deskwave/releases/latest/download/SHA256SUMS.txt) | Fingerprints to check your download is genuine (see [advanced](#advanced-install)). |
 
+Ignore the **Source code** files that GitHub adds to every release: they hold the project's code,
+not the app.
+
 Inside `Deskwave-Windows.zip`:
 
 ```text
