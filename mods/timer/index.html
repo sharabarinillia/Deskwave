@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Focus timer</title>
+  <link rel="stylesheet" href="/_sdk/deskwave.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="/_sdk/deskwave.js" defer></script>
+  <script src="i18n.js" defer></script>
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <main id="root" class="timer focus">
+    <div id="phase" class="phase">Focus</div>
+    <div id="clock" class="clock" role="timer">25:00</div>
+    <div class="progress"><div id="bar" class="fill"></div></div>
+    <div class="controls">
+      <button id="start" class="dw-btn primary" disabled>Start</button>
+      <button id="reset" class="dw-btn subtle" data-t="reset" disabled>Reset</button>
+      <button id="skip" class="dw-btn subtle" data-t="skip" disabled>Skip</button>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>System</title>
+  <link rel="stylesheet" href="/_sdk/deskwave.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="/_sdk/deskwave.js" defer></script>
+  <script src="i18n.js" defer></script>
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <main class="system">
+    <div class="stat">
+      <div class="line"><span data-t="cpu">Processor</span><span id="cpu" class="value">–</span></div>
+      <div class="meter"><div id="cpu-bar" class="fill"></div></div>
+    </div>
+    <div class="stat">
+      <div class="line"><span data-t="memory">Memory</span><span id="memory" class="value">–</span></div>
+      <div class="meter"><div id="memory-bar" class="fill"></div></div>
+    </div>
+    <div class="stat">
+      <div class="line"><span data-t="disk">Disk</span><span id="disk" class="value">–</span></div>
+      <div class="meter"><div id="disk-bar" class="fill"></div></div>
+    </div>
+    <div class="stat">
+      <div class="line stack"><span data-t="network">Network</span><span id="net" class="value">–</span></div>
+    </div>
+  </main>
+</body>
+</html>

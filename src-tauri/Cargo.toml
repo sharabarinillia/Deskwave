@@ -1,0 +1,40 @@
+[package]
+name = "deskwave"
+description = "Animated wallpapers and desktop widgets for Windows"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+deskwave-core = { path = "../crates/deskwave-core" }
+serde.workspace = true
+serde_json.workspace = true
+# Pinned: the private-address check plugs into ureq's semver-exempt resolver API.
+ureq = { version = "=3.5.2", default-features = false, features = ["rustls"] }
+tauri = { version = "2.12", features = ["tray-icon", "protocol-asset"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Foundation",
+    "Media_Control",
+    "Win32_Foundation",
+    "Win32_Graphics_Dwm",
+    "Win32_Globalization",
+    "Win32_Graphics_Gdi",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_NetworkManagement_Ndis",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Power",
+    "Win32_System_Registry",
+    "Win32_System_StationsAndDesktops",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+    "Win32_System_WinRT",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }

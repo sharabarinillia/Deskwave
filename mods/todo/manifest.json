@@ -1,0 +1,39 @@
+{
+  "id": "deskwave.todo",
+  "name": "To-do",
+  "version": "0.3.0",
+  "kind": "widget",
+  "entry": "index.html",
+  "author": "Deskwave",
+  "description": "A short list of things to get done",
+  "size": {
+    "w": 304,
+    "h": 304
+  },
+  "translations": {
+    "uk": {
+      "name": "Справи",
+      "description": "Короткий список справ"
+    },
+    "fr": {
+      "name": "À faire",
+      "description": "Une courte liste de choses à faire"
+    },
+    "nl": {
+      "name": "Taken",
+      "description": "Een korte lijst met dingen die je moet doen"
+    },
+    "de": {
+      "name": "Aufgaben",
+      "description": "Eine kurze Liste mit Erledigungen"
+    },
+    "pl": {
+      "name": "Zadania",
+      "description": "Krótka lista rzeczy do zrobienia"
+    },
+    "es": {
+      "name": "Tareas",
+      "description": "Una lista corta de cosas por hacer"
+    }
+  }
+}

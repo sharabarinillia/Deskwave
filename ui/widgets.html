@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Deskwave widgets</title>
+  <link rel="stylesheet" href="css/fluent.css">
+  <link rel="stylesheet" href="css/widgets.css">
+  <script type="module" src="js/widgets.js"></script>
+</head>
+<body>
+  <div id="scrim"></div>
+  <div id="widgets"></div>
+  <div id="toolbar" role="toolbar" data-i18n-attr="aria-label:layer.toolbar">
+    <button class="btn subtle" id="add" aria-haspopup="menu" aria-expanded="false" aria-controls="menu">
+      <svg class="icon" aria-hidden="true"><use href="img/icons.svg#i-add"/></svg><span data-i18n="layer.addWidget"></span>
+    </button>
+    <span class="hint" data-i18n="layer.hint"></span>
+    <button class="btn primary" id="done" data-i18n="layer.done"></button>
+  </div>
+  <div id="menu" role="menu" data-i18n-attr="aria-label:layer.addWidget" hidden></div>
+</body>
+</html>

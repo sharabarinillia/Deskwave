@@ -1,0 +1,35 @@
+{
+  "id": "deskwave.aurora",
+  "name": "Aurora",
+  "version": "0.3.0",
+  "kind": "wallpaper",
+  "entry": "index.html",
+  "author": "Deskwave",
+  "description": "Soft northern lights that change color through the day",
+  "translations": {
+    "uk": {
+      "name": "Полярне сяйво",
+      "description": "М’яке полярне сяйво, що змінює колір протягом дня"
+    },
+    "fr": {
+      "name": "Aurore boréale",
+      "description": "Des aurores boréales douces qui changent de couleur au fil de la journée"
+    },
+    "nl": {
+      "name": "Noorderlicht",
+      "description": "Zacht noorderlicht dat de hele dag van kleur verandert"
+    },
+    "de": {
+      "name": "Polarlicht",
+      "description": "Sanftes Polarlicht, das im Lauf des Tages die Farbe wechselt"
+    },
+    "pl": {
+      "name": "Zorza polarna",
+      "description": "Łagodna zorza polarna, która zmienia kolor w ciągu dnia"
+    },
+    "es": {
+      "name": "Aurora boreal",
+      "description": "Suaves auroras boreales que cambian de color a lo largo del día"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Now playing</title>
+  <link rel="stylesheet" href="/_sdk/deskwave.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="/_sdk/deskwave.js" defer></script>
+  <script src="i18n.js" defer></script>
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <main id="root" class="media idle">
+    <div class="info">
+      <div id="title" class="title">Nothing playing</div>
+      <div id="artist" class="artist">Play something in any app to control it here.</div>
+    </div>
+    <div class="controls">
+      <button id="previous" class="dw-btn subtle icon" aria-label="Previous" data-t-label="previous" disabled>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 3.5v9M12.5 3.75v8.5L6.5 8z"/></svg>
+      </button>
+      <button id="toggle" class="dw-btn icon play" aria-label="Play" disabled>
+        <svg class="when-paused" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.25v9.5L12.5 8z"/></svg>
+        <svg class="when-playing" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3.5v9M10.5 3.5v9"/></svg>
+      </button>
+      <button id="next" class="dw-btn subtle icon" aria-label="Next" data-t-label="next" disabled>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M12 3.5v9M3.5 3.75v8.5L9.5 8z"/></svg>
+      </button>
+    </div>
+  </main>
+</body>
+</html>

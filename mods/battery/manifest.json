@@ -1,0 +1,42 @@
+{
+  "id": "deskwave.battery",
+  "name": "Battery",
+  "version": "0.3.0",
+  "kind": "widget",
+  "entry": "index.html",
+  "author": "Deskwave",
+  "description": "Charge level and time left",
+  "permissions": [
+    "battery"
+  ],
+  "size": {
+    "w": 260,
+    "h": 120
+  },
+  "translations": {
+    "uk": {
+      "name": "Батарея",
+      "description": "Рівень заряду й залишок часу"
+    },
+    "fr": {
+      "name": "Batterie",
+      "description": "Niveau de charge et autonomie restante"
+    },
+    "nl": {
+      "name": "Batterij",
+      "description": "Laadniveau en resterende tijd"
+    },
+    "de": {
+      "name": "Akku",
+      "description": "Ladestand und Restlaufzeit"
+    },
+    "pl": {
+      "name": "Bateria",
+      "description": "Poziom naładowania i pozostały czas"
+    },
+    "es": {
+      "name": "Batería",
+      "description": "Nivel de carga y tiempo restante"
+    }
+  }
+}

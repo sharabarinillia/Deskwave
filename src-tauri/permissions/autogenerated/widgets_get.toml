@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-widgets-get"
+description = "Enables the widgets_get command without any pre-configured scope."
+commands.allow = ["widgets_get"]
+
+[[permission]]
+identifier = "deny-widgets-get"
+description = "Denies the widgets_get command without any pre-configured scope."
+commands.deny = ["widgets_get"]

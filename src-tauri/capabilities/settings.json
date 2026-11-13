@@ -1,0 +1,24 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "settings",
+  "description": "Settings window: wallpapers and gradients, mod approval, internet switch, language, startup, pause options, fixed links and data folders.",
+  "windows": [
+    "settings"
+  ],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-settings-get",
+    "allow-set-wallpaper",
+    "allow-set-mod-approved",
+    "allow-set-pause-options",
+    "allow-open-folder",
+    "allow-set-edit-mode",
+    "allow-set-internet",
+    "allow-set-autostart",
+    "allow-set-language",
+    "allow-gradient-save",
+    "allow-gradient-delete",
+    "allow-open-link"
+  ]
+}

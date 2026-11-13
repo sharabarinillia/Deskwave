@@ -1,0 +1,42 @@
+{
+  "id": "deskwave.media",
+  "name": "Now playing",
+  "version": "0.3.0",
+  "kind": "widget",
+  "entry": "index.html",
+  "author": "Deskwave",
+  "description": "What's playing, with play, pause and skip",
+  "permissions": [
+    "media"
+  ],
+  "size": {
+    "w": 304,
+    "h": 120
+  },
+  "translations": {
+    "uk": {
+      "name": "Зараз грає",
+      "description": "Що грає, з відтворенням, паузою та перемиканням"
+    },
+    "fr": {
+      "name": "En cours de lecture",
+      "description": "Ce qui est en lecture, avec lecture, pause et piste suivante"
+    },
+    "nl": {
+      "name": "Nu bezig",
+      "description": "Wat er speelt, met afspelen, pauzeren en overslaan"
+    },
+    "de": {
+      "name": "Aktuelle Wiedergabe",
+      "description": "Was gerade läuft, mit Wiedergabe, Pause und Überspringen"
+    },
+    "pl": {
+      "name": "Teraz odtwarzane",
+      "description": "Co jest odtwarzane, z przyciskami odtwarzania, pauzy i pomijania"
+    },
+    "es": {
+      "name": "Reproduciendo",
+      "description": "Lo que suena, con reproducir, pausar y saltar"
+    }
+  }
+}

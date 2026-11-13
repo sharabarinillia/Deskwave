@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-internet"
+description = "Enables the set_internet command without any pre-configured scope."
+commands.allow = ["set_internet"]
+
+[[permission]]
+identifier = "deny-set-internet"
+description = "Denies the set_internet command without any pre-configured scope."
+commands.deny = ["set_internet"]

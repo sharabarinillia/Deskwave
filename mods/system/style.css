@@ -1,0 +1,36 @@
+.system {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  height: 100%;
+  padding: 14px 20px;
+}
+.line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  line-height: 20px;
+}
+.value { color: var(--dw-text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Network figures get their own line: in some languages they are longer than the card. */
+.line.stack { display: grid; gap: 2px; justify-content: start; }
+.line.stack .value { white-space: normal; }
+.meter {
+  height: 4px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--dw-subtle-hover);
+}
+.fill {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--dw-accent);
+  transition: width 600ms cubic-bezier(0, 0, 0, 1);
+}
+/* Only meaningful pressure turns a bar red. */
+.fill.high { background: var(--dw-critical); }

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Weather</title>
+  <link rel="stylesheet" href="/_sdk/deskwave.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="/_sdk/deskwave.js" defer></script>
+  <script src="i18n.js" defer></script>
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <!-- Inline on purpose: sandboxed mods cannot <use> an external SVG file. -->
+  <svg width="0" height="0" class="sprite" aria-hidden="true">
+  <defs>
+    <path id="cloud-shape" d="M7.5 18.5h9.25a3.75 3.75 0 0 0 .5-7.47A5.25 5.25 0 0 0 7.2 10a4.25 4.25 0 0 0 .3 8.5z"/>
+    <path id="cloud-high-shape" d="M7.5 14.5h9.25a3.5 3.5 0 0 0 .45-6.97A5 5 0 0 0 7.35 6.6a4 4 0 0 0 .15 7.9z"/>
+  </defs>
+  <symbol id="clear-day" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/></symbol>
+  <symbol id="clear-night" viewBox="0 0 24 24"><path d="M19.5 14.6A7.75 7.75 0 0 1 9.4 4.5a7.75 7.75 0 1 0 10.1 10.1z"/></symbol>
+  <symbol id="partly-day" viewBox="0 0 24 24"><path d="M9.5 3v1.25M4.25 5.25l.9.9M2.75 10h1.25M14.75 5.25l-.9.9"/><path d="M5.7 12.4a4 4 0 0 1 7.6-3.1"/><use href="#cloud-shape"/></symbol>
+  <symbol id="partly-night" viewBox="0 0 24 24"><path d="M13.8 8.2A5 5 0 0 1 7.6 3.2a5 5 0 0 0-2.4 8.9"/><use href="#cloud-shape"/></symbol>
+  <symbol id="cloud" viewBox="0 0 24 24"><use href="#cloud-shape"/></symbol>
+  <symbol id="fog" viewBox="0 0 24 24"><use href="#cloud-high-shape"/><path d="M5 18h14M7.5 21h9"/></symbol>
+  <symbol id="drizzle" viewBox="0 0 24 24"><use href="#cloud-high-shape"/><path d="M8.5 18v.5M12 19.5v.5M15.5 18v.5M10 21.5v.5M14 21.5v.5"/></symbol>
+  <symbol id="rain" viewBox="0 0 24 24"><use href="#cloud-high-shape"/><path d="M8.5 17.5l-1 3M12.5 17.5l-1 3M16.5 17.5l-1 3"/></symbol>
+  <symbol id="snow" viewBox="0 0 24 24"><use href="#cloud-high-shape"/><path d="M8 18.5v2M7 19.5h2M12 19.5v2M11 20.5h2M16 18.5v2M15 19.5h2"/></symbol>
+  <symbol id="storm" viewBox="0 0 24 24"><use href="#cloud-high-shape"/><path d="M12.5 15.5l-2.5 3.5h3l-2 3.5"/></symbol>
+  </svg>
+  <main class="weather">
+    <section id="now" class="now" hidden>
+      <div class="reading">
+        <svg class="sky" aria-hidden="true"><use id="sky" href="#cloud"/></svg>
+        <div>
+          <div class="temp"><span id="temp"></span><span class="deg">°</span></div>
+          <div id="desc" class="desc"></div>
+        </div>
+      </div>
+      <div class="meta">
+        <button id="place" class="dw-btn subtle place" title="Change city" data-t-title="change"></button>
+        <span id="range" class="range"></span>
+      </div>
+    </section>
+
+    <div id="setup" class="setup" hidden>
+      <label for="query" data-t="showFor">Show weather for</label>
+      <div class="field">
+        <input id="query" class="dw-input" placeholder="City" data-t-placeholder="city" autocomplete="off">
+        <button id="search" class="dw-btn primary" data-t="search">Search</button>
+      </div>
+      <div id="results" class="results" role="list"></div>
+    </div>
+
+    <p id="note" class="note" role="status" hidden></p>
+  </main>
+</body>
+</html>

@@ -1,0 +1,50 @@
+.sprite { position: absolute; }
+
+.weather {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 12px 16px 12px 20px;
+  container-type: size;
+}
+
+.now { display: flex; flex: 1; flex-direction: column; justify-content: space-between; min-height: 0; }
+.reading { display: flex; align-items: center; gap: 14px; }
+.sky {
+  flex: none;
+  width: min(36cqh, 64px);
+  height: min(36cqh, 64px);
+  fill: none;
+  stroke: var(--dw-text);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.temp {
+  font: 600 min(34cqh, 22cqw) / 1 var(--dw-font-display);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.deg { color: var(--dw-text-2); font-weight: 400; }
+.desc { margin-top: 4px; color: var(--dw-text-2); }
+.meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.place {
+  min-width: 0;
+  margin-left: -8px;
+  padding: 0 8px;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+.range { color: var(--dw-text-2); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.setup { display: flex; flex: 1; flex-direction: column; gap: 8px; min-height: 0; }
+.setup label { font-weight: 600; }
+.field { display: flex; gap: 8px; }
+.field .dw-input { flex: 1; }
+.results { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.results .dw-btn { justify-content: flex-start; flex: none; overflow: hidden; text-overflow: ellipsis; }
+.results small { color: var(--dw-text-2); }
+
+.note { flex: none; margin: 6px 0 0; color: var(--dw-text-2); font-size: 12px; line-height: 16px; }
+.note.error { color: var(--dw-critical); }

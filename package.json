@@ -1,0 +1,17 @@
+{
+  "name": "deskwave",
+  "private": true,
+  "version": "0.3.0",
+  "description": "Build tooling only. The app ships no npm packages.",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "check-strings": "node scripts/check-strings.mjs",
+    "package": "node scripts/package.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.4"
+  },
+  "type": "module"
+}

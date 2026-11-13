@@ -1,0 +1,31 @@
+.clock {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+  padding: 12px 20px 14px;
+  container-type: size;
+}
+.time {
+  display: flex;
+  align-items: baseline;
+  gap: 0.18em;
+  font: 600 min(48cqh, 27cqw) / 1 var(--dw-font-display);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.period {
+  color: var(--dw-text-2);
+  font-size: 0.34em;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.date {
+  margin-top: 0.5em;
+  overflow: hidden;
+  color: var(--dw-text-2);
+  font-size: clamp(12px, 11cqh, 20px);
+  line-height: 1.3;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

@@ -1,0 +1,20 @@
+.media {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+  padding: 12px 12px 12px 20px;
+}
+.info { flex: 1; min-width: 0; }
+.title, .artist { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.title { font-size: 14px; font-weight: 600; line-height: 20px; }
+.artist { margin-top: 2px; color: var(--dw-text-2); font-size: 12px; line-height: 16px; }
+.idle .artist { white-space: normal; }
+
+.controls { display: flex; flex: none; align-items: center; gap: 2px; }
+.play { width: 40px; height: 40px; border-radius: 999px; }
+.play svg { width: 18px; height: 18px; fill: currentColor; stroke-width: 1; }
+.when-playing { display: none; }
+.playing .when-playing { display: block; }
+.playing .when-paused { display: none; }
+.playing .when-playing { fill: none; stroke-width: 2; }

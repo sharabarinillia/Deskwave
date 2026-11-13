@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-system-get"
+description = "Enables the system_get command without any pre-configured scope."
+commands.allow = ["system_get"]
+
+[[permission]]
+identifier = "deny-system-get"
+description = "Denies the system_get command without any pre-configured scope."
+commands.deny = ["system_get"]

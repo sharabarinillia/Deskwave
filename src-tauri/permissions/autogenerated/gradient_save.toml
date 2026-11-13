@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-gradient-save"
+description = "Enables the gradient_save command without any pre-configured scope."
+commands.allow = ["gradient_save"]
+
+[[permission]]
+identifier = "deny-gradient-save"
+description = "Denies the gradient_save command without any pre-configured scope."
+commands.deny = ["gradient_save"]

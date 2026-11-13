@@ -1,0 +1,35 @@
+.todo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  padding: 14px 12px 8px 16px;
+}
+.add { display: flex; gap: 6px; }
+.add .dw-input { flex: 1; }
+
+.list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 0 0 0 4px;
+  border-radius: 4px;
+}
+.item:hover { background: var(--dw-subtle-hover); }
+.item label { flex: 1; min-width: 0; padding: 6px 0; overflow-wrap: anywhere; }
+.item.done label { color: var(--dw-text-2); text-decoration: line-through; }
+.item .remove { opacity: 0; }
+.item:hover .remove, .item .remove:focus-visible { opacity: 1; }
+
+.empty { flex: 1; margin: 0; padding-top: 8px; color: var(--dw-text-2); }
+.footer { display: flex; align-items: center; justify-content: space-between; min-height: 32px; }
+.count { color: var(--dw-text-2); font-size: 12px; white-space: nowrap; }

@@ -1,0 +1,43 @@
+{
+  "id": "deskwave.weather",
+  "name": "Weather",
+  "version": "0.3.0",
+  "kind": "widget",
+  "entry": "index.html",
+  "author": "Deskwave",
+  "description": "Current weather and today's high and low, from Open-Meteo",
+  "network": [
+    "geocoding-api.open-meteo.com",
+    "api.open-meteo.com"
+  ],
+  "size": {
+    "w": 304,
+    "h": 168
+  },
+  "translations": {
+    "uk": {
+      "name": "Погода",
+      "description": "Поточна погода й сьогоднішні максимум і мінімум від Open-Meteo"
+    },
+    "fr": {
+      "name": "Météo",
+      "description": "La météo actuelle et les températures du jour, par Open-Meteo"
+    },
+    "nl": {
+      "name": "Weer",
+      "description": "Het huidige weer en de hoogste en laagste temperatuur van vandaag, via Open-Meteo"
+    },
+    "de": {
+      "name": "Wetter",
+      "description": "Aktuelles Wetter sowie Höchst- und Tiefstwerte des Tages von Open-Meteo"
+    },
+    "pl": {
+      "name": "Pogoda",
+      "description": "Bieżąca pogoda oraz dzisiejsza temperatura maksymalna i minimalna z Open-Meteo"
+    },
+    "es": {
+      "name": "Tiempo",
+      "description": "El tiempo actual y las temperaturas máxima y mínima de hoy, de Open-Meteo"
+    }
+  }
+}

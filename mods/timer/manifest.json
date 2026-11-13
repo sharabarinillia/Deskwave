@@ -1,0 +1,39 @@
+{
+  "id": "deskwave.timer",
+  "name": "Focus timer",
+  "version": "0.3.0",
+  "kind": "widget",
+  "entry": "index.html",
+  "author": "Deskwave",
+  "description": "25 minutes of focus, then a 5-minute break",
+  "size": {
+    "w": 288,
+    "h": 184
+  },
+  "translations": {
+    "uk": {
+      "name": "Таймер фокусування",
+      "description": "25 хвилин зосередження, потім 5 хвилин перерви"
+    },
+    "fr": {
+      "name": "Minuteur de concentration",
+      "description": "25 minutes de concentration, puis 5 minutes de pause"
+    },
+    "nl": {
+      "name": "Focustimer",
+      "description": "25 minuten focus, daarna 5 minuten pauze"
+    },
+    "de": {
+      "name": "Fokus-Timer",
+      "description": "25 Minuten Fokus, dann 5 Minuten Pause"
+    },
+    "pl": {
+      "name": "Minutnik skupienia",
+      "description": "25 minut skupienia, potem 5 minut przerwy"
+    },
+    "es": {
+      "name": "Temporizador de concentración",
+      "description": "25 minutos de concentración y luego 5 de descanso"
+    }
+  }
+}

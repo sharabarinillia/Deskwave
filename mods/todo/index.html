@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>To-do</title>
+  <link rel="stylesheet" href="/_sdk/deskwave.css">
+  <link rel="stylesheet" href="style.css">
+  <script src="/_sdk/deskwave.js" defer></script>
+  <script src="i18n.js" defer></script>
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <main class="todo">
+    <div class="add">
+      <input id="new" class="dw-input" placeholder="Add a task" aria-label="New task" data-t-placeholder="add" data-t-label="newTask" maxlength="200" disabled>
+      <button id="add" class="dw-btn icon" aria-label="Add task" data-t-label="addTask" disabled>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>
+      </button>
+    </div>
+    <ul id="list" class="list"></ul>
+    <p id="empty" class="empty" data-t="empty" hidden>Nothing to do. Nice.</p>
+    <div class="footer">
+      <span id="count" class="count"></span>
+      <button id="clear" class="dw-btn subtle" data-t="clear" hidden>Clear completed</button>
+    </div>
+  </main>
+</body>
+</html>

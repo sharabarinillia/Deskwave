@@ -1,0 +1,42 @@
+{
+  "id": "deskwave.system",
+  "name": "System",
+  "version": "0.3.0",
+  "kind": "widget",
+  "entry": "index.html",
+  "author": "Deskwave",
+  "description": "Processor, memory, disk and network use",
+  "permissions": [
+    "system"
+  ],
+  "size": {
+    "w": 288,
+    "h": 208
+  },
+  "translations": {
+    "uk": {
+      "name": "Система",
+      "description": "Використання процесора, пам’яті, диска й мережі"
+    },
+    "fr": {
+      "name": "Système",
+      "description": "Utilisation du processeur, de la mémoire, du disque et du réseau"
+    },
+    "nl": {
+      "name": "Systeem",
+      "description": "Gebruik van processor, geheugen, schijf en netwerk"
+    },
+    "de": {
+      "name": "System",
+      "description": "Auslastung von Prozessor, Arbeitsspeicher, Datenträger und Netzwerk"
+    },
+    "pl": {
+      "name": "System",
+      "description": "Użycie procesora, pamięci, dysku i sieci"
+    },
+    "es": {
+      "name": "Sistema",
+      "description": "Uso del procesador, la memoria, el disco y la red"
+    }
+  }
+}

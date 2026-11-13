@@ -1,0 +1,120 @@
+/* Deskwave mod base styles. The host draws the widget card; keep the page background
+   transparent and use these tokens so mods match Windows light/dark and the accent color. */
+:root {
+  --dw-accent: #005fb8;
+  --dw-accent-raw: #0067c0;
+  --dw-text: rgb(0 0 0 / 0.896);
+  --dw-text-2: rgb(0 0 0 / 0.606);
+  --dw-text-3: rgb(0 0 0 / 0.446);
+  --dw-success: #0f7b0f;
+  --dw-critical: #c42b1c;
+  --dw-font: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --dw-font-display: "Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --dw-text: #fff;
+    --dw-text-2: rgb(255 255 255 / 0.786);
+    --dw-text-3: rgb(255 255 255 / 0.544);
+    --dw-success: #6ccb5f;
+    --dw-critical: #ff99a4;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* `hidden` must win over any display rule a mod sets. */
+[hidden] { display: none !important; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  color: var(--dw-text);
+  font: 14px/20px var(--dw-font);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: color-mix(in srgb, var(--dw-accent) 35%, transparent); }
+
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--dw-text-3) padding-box;
+}
+
+/* ---- Optional controls, Fluent style. Opt in with the class names. ---- */
+:root {
+  --dw-control: rgb(255 255 255 / 0.55);
+  --dw-control-hover: rgb(255 255 255 / 0.75);
+  --dw-stroke: rgb(0 0 0 / 0.1);
+  --dw-subtle-hover: rgb(0 0 0 / 0.06);
+  --dw-on-accent: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --dw-control: rgb(255 255 255 / 0.07);
+    --dw-control-hover: rgb(255 255 255 / 0.11);
+    --dw-stroke: rgb(255 255 255 / 0.1);
+    --dw-subtle-hover: rgb(255 255 255 / 0.08);
+  }
+}
+
+.dw-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--dw-stroke);
+  border-radius: 4px;
+  background: var(--dw-control);
+  color: var(--dw-text);
+  font: inherit;
+  white-space: nowrap;
+}
+.dw-btn:hover { background: var(--dw-control-hover); }
+.dw-btn:active { opacity: 0.8; }
+.dw-btn.primary { border-color: transparent; background: var(--dw-accent); color: var(--dw-on-accent); }
+.dw-btn.subtle { border-color: transparent; background: transparent; }
+.dw-btn.subtle:hover { background: var(--dw-subtle-hover); }
+.dw-btn.icon { width: 32px; padding: 0; }
+.dw-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.dw-btn:disabled { opacity: 0.45; }
+
+.dw-input {
+  height: 32px;
+  min-width: 0;
+  padding: 0 10px;
+  border: 1px solid var(--dw-stroke);
+  border-bottom-color: var(--dw-text-3);
+  border-radius: 4px;
+  outline: 0;
+  background: var(--dw-control);
+  color: var(--dw-text);
+  font: inherit;
+  caret-color: var(--dw-accent);
+}
+.dw-input::placeholder { color: var(--dw-text-2); }
+.dw-input:focus { border-bottom: 2px solid var(--dw-accent); background: var(--dw-control-hover); }
+
+.dw-check {
+  appearance: none;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 1px solid var(--dw-text-2);
+  border-radius: 4px;
+  background: var(--dw-control) center / 12px no-repeat;
+}
+.dw-check:checked {
+  border-color: var(--dw-accent);
+  background-color: var(--dw-accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E");
+}
+
+:focus-visible { outline: 2px solid var(--dw-text); outline-offset: 1px; border-radius: 4px; }

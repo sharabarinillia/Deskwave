@@ -1,0 +1,39 @@
+{
+  "id": "deskwave.clock",
+  "name": "Clock",
+  "version": "0.3.0",
+  "kind": "widget",
+  "entry": "index.html",
+  "author": "Deskwave",
+  "description": "Time and date",
+  "size": {
+    "w": 300,
+    "h": 150
+  },
+  "translations": {
+    "uk": {
+      "name": "Годинник",
+      "description": "Час і дата"
+    },
+    "fr": {
+      "name": "Horloge",
+      "description": "Heure et date"
+    },
+    "nl": {
+      "name": "Klok",
+      "description": "Tijd en datum"
+    },
+    "de": {
+      "name": "Uhr",
+      "description": "Uhrzeit und Datum"
+    },
+    "pl": {
+      "name": "Zegar",
+      "description": "Godzina i data"
+    },
+    "es": {
+      "name": "Reloj",
+      "description": "Hora y fecha"
+    }
+  }
+}

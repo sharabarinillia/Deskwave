@@ -1,0 +1,78 @@
+name: Release
+
+# Runs when a version tag such as v0.3.0 is pushed, or created by publishing a release with a new
+# tag on GitHub's Releases page. Builds both installers on GitHub's own
+# Windows machines, packages them with a READ ME FIRST file, publishes SHA-256 checksums and a
+# signed build-provenance attestation, then publishes the release. Asset names stay the same
+# across versions, so .../releases/latest/download/Deskwave-Setup.exe always works.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    name: Build and publish the release
+    runs-on: windows-latest
+    permissions:
+      contents: write      # create the release
+      id-token: write      # sign the attestation
+      attestations: write  # store the attestation
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: node scripts/check-strings.mjs
+      - run: cargo test --workspace --locked
+      - run: npx tauri build
+      - run: node scripts/package.mjs
+
+      - name: Zip the download and write checksums
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/Deskwave-Windows -DestinationPath dist/Deskwave-Windows.zip
+          'Deskwave-Setup.exe', 'Deskwave.msi', 'Deskwave-Windows.zip' | ForEach-Object {
+            '{0}  {1}' -f (Get-FileHash "dist/$_" -Algorithm SHA256).Hash.ToLower(), $_
+          } | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+          Get-Content dist/SHA256SUMS.txt
+
+      # Attestations need a public repository (or GitHub Enterprise). Checked at run time, so
+      # re-running this workflow after the repository goes public adds them to the release.
+      - name: Check whether the repository is public
+        id: repo
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $private = gh api "repos/$env:GITHUB_REPOSITORY" --jq .private
+          "public=$($private -eq 'false')" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/attest-build-provenance@v4
+        if: steps.repo.outputs.public == 'True'
+        with:
+          subject-path: |
+            dist/Deskwave-Setup.exe
+            dist/Deskwave.msi
+            dist/Deskwave-Windows.zip
+
+      - name: Publish the GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          $files = 'dist/Deskwave-Setup.exe', 'dist/Deskwave.msi', 'dist/Deskwave-Windows.zip', 'dist/SHA256SUMS.txt'
+          gh release view $env:TAG *> $null
+          if ($LASTEXITCODE -eq 0) {
+            # The release was created on GitHub's Releases page (which also creates the tag), or
+            # this is a re-run: set the title and notes from the repository, then attach the files.
+            gh release edit $env:TAG --title "Deskwave $env:TAG" --notes-file "docs/releases/$env:TAG.md"
+            gh release upload $env:TAG @files --clobber
+          } else {
+            gh release create $env:TAG @files --verify-tag --title "Deskwave $env:TAG" --notes-file "docs/releases/$env:TAG.md"
+          }

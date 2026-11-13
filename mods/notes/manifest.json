@@ -1,0 +1,39 @@
+{
+  "id": "deskwave.notes",
+  "name": "Notes",
+  "version": "0.3.0",
+  "kind": "widget",
+  "entry": "index.html",
+  "author": "Deskwave",
+  "description": "A note that stays on your desktop",
+  "size": {
+    "w": 300,
+    "h": 260
+  },
+  "translations": {
+    "uk": {
+      "name": "Нотатки",
+      "description": "Нотатка, що лишається на робочому столі"
+    },
+    "fr": {
+      "name": "Notes",
+      "description": "Une note qui reste sur votre bureau"
+    },
+    "nl": {
+      "name": "Notities",
+      "description": "Een notitie die op je bureaublad blijft"
+    },
+    "de": {
+      "name": "Notizen",
+      "description": "Eine Notiz, die auf Ihrem Desktop bleibt"
+    },
+    "pl": {
+      "name": "Notatki",
+      "description": "Notatka, która zostaje na pulpicie"
+    },
+    "es": {
+      "name": "Notas",
+      "description": "Una nota que se queda en tu escritorio"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "widgets",
+  "description": "Widget layer: manage its own widgets and their storage, and serve them the data their approved permissions allow.",
+  "windows": [
+    "widgets-*"
+  ],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-widgets-get",
+    "allow-widgets-save",
+    "allow-widget-add",
+    "allow-widget-remove",
+    "allow-set-hit-rects",
+    "allow-storage-get",
+    "allow-storage-set",
+    "allow-battery-get",
+    "allow-set-edit-mode",
+    "allow-net-fetch",
+    "allow-system-get",
+    "allow-media-get",
+    "allow-media-control"
+  ]
+}
