@@ -1,13 +1,13 @@
 # Deskwave — specification
 
-Deskwave replaces the Windows desktop wallpaper with an animated one and lets you place
-widgets on the desktop. Anyone can write their own widgets ("mods") in HTML/CSS/JS.
+Deskwave replaces the desktop wallpaper on Windows and macOS with an animated one and lets you
+place widgets on the desktop. Anyone can write their own widgets ("mods") in HTML/CSS/JS.
 
-Status: v0.3. Sections marked **(planned)** are designed but not built yet.
+Status: v0.4. Sections marked **(planned)** are designed but not built yet.
 
 ## Principles
 
-1. **Local first.** Everything runs on the user's PC. No account, no server, no telemetry,
+1. **Local first.** Everything runs on the user's computer. No account, no server, no telemetry,
    no crash uploads, no automatic update checks.
 2. **Offline by default.** The app makes no network requests unless the user turns the
    internet switch on, and then only for widgets they approved, to the hosts those
@@ -21,21 +21,23 @@ Status: v0.3. Sections marked **(planned)** are designed but not built yet.
 
 ## Platform
 
-- Windows 10 (1809+) and Windows 11, including 24H2+ "raised desktop".
-- Tauri 2 + Rust core; UI and mods render in the system WebView2.
+- Windows 10 (1809+) and Windows 11, including 24H2+ "raised desktop". Pages render in WebView2.
+- macOS 12+, one universal app for Apple Silicon and Intel. Pages render in WKWebView.
+- Tauri 2 + Rust. Everything that differs between the two lives in `src-tauri/src/platform`
+  (`win.rs`, `mac.rs`), behind the same functions.
 - Multi-monitor: each monitor has its own wallpaper and widget layout. Per-monitor DPI.
 
 ## Architecture
 
 ```
-Deskwave.exe (Rust, Tauri 2)
+Deskwave (Rust, Tauri 2)
  ├─ poller thread ── pause state, battery, click-through, Explorer-restart watchdog
  ├─ dwmod:// protocol ── serves mod files + SDK, adds CSP / sandbox headers
- ├─ tray icon ── click: Settings · menu: Open Deskwave · Edit widgets · Pause animations · Quit
- └─ WebView2 windows (one browser process, shared)
-     ├─ wallpaper-N   per monitor, parented into the desktop below the icons
-     │    └─ <iframe sandbox> wallpaper mod, a gradient, or <video>/<img> from the wallpapers folder
-     ├─ widgets-N     per monitor, transparent, owned by the desktop window
+ ├─ tray / menu bar icon ── click: Settings · menu: Open · Edit widgets · Pause · (Mac) Keep awake · Quit
+ └─ web view windows (WebView2 on Windows, WKWebView on macOS)
+     ├─ wallpaper-N   per monitor, on the desktop below the icons
+     │    └─ <iframe sandbox> wallpaper mod, a gradient, an album, or <video>/<img> from the wallpapers folder
+     ├─ widgets-N     per monitor, transparent, just above the desktop
      │    └─ <iframe sandbox> one per placed widget
      └─ settings      normal window, opened at launch and from the tray
 ```
@@ -45,9 +47,9 @@ Repository layout:
 | Path | What |
 |---|---|
 | `crates/deskwave-core` | Platform-independent logic: manifest validation, CSP, config, storage, languages. Unit-tested on any OS. |
-| `src-tauri` | The Windows app: windows, desktop integration, protocol, IPC commands, tray. |
+| `src-tauri` | The app: windows, desktop integration (`src/platform`), protocol, IPC commands, tray. |
 | `ui` | Host pages (`wallpaper.html`, `widgets.html`, `settings.html`) and their translations. No bundler, no npm runtime deps. |
-| `sdk` | `deskwave.js` / `deskwave.css` that mods include. Served at `http://dwmod.localhost/_sdk/`. |
+| `sdk` | `deskwave.js` / `deskwave.css` that mods include. Served at `<MOD_ORIGIN>/_sdk/` (`http://dwmod.localhost` on Windows, `dwmod://localhost` on macOS). |
 | `mods` | Built-in mods. They use the same API and sandbox as third-party mods. |
 
 ### Desktop integration (Windows)
@@ -71,32 +73,57 @@ Repository layout:
 - **Edit mode** (tray → Edit widgets): layers come to the front with a scrim. Widgets can be
   dragged, resized (8 px grid), added and removed. Esc or Done exits.
 
+### Desktop integration (macOS)
+
+- **Window levels** do what parenting does on Windows (`platform/mac.rs`, through `msg_send!` on
+  the `NSWindow` Tauri creates, always on the main thread):
+  - **Wallpaper windows** sit at `kCGDesktopWindowLevel`, the level of the desktop picture, so
+    they're below the desktop icons. They ignore the mouse, so clicks reach Finder's desktop.
+  - **Widget layers** sit one level above `kCGDesktopIconWindowLevel`: above the icons, below
+    every app. Clicking a widget doesn't raise it. Edit mode lifts them to the floating level.
+  - Both join every Space, stay put in Mission Control and stay out of Cmd-\` cycling.
+- **Transparent widget layers** need Tauri's `macOSPrivateApi`, so Deskwave can't go to the Mac
+  App Store. It is distributed from GitHub.
+- **No Dock icon** while only the desktop layers show (`ActivationPolicy::Accessory`). Opening
+  Settings switches to `Regular`, so Settings appears in the Dock and Cmd-Tab, and closing it
+  switches back.
+- **Not available:** Now playing (macOS has no public API to read or control other apps'
+  playback, so the media widget isn't offered) and media `permissions` therefore do nothing.
+
 ### Pausing
 
 The poller re-evaluates once a second. Each monitor's wallpaper pauses (video paused, mods
 receive `pause`) when any enabled condition holds:
 
-| Setting (default on) | Condition |
-|---|---|
-| Fullscreen app or game | A visible window covers the whole monitor |
-| Desktop covered | A maximized window is on the monitor |
-| On battery | AC unplugged or Battery Saver on |
-| Locked / remote | Workstation locked, or a Remote Desktop session |
-| Tray → Pause animations | Manual, all monitors |
+| Setting (default on) | Windows | macOS |
+|---|---|---|
+| Fullscreen app or game | A visible window covers the whole monitor | The wallpaper window's `occlusionState` says it's hidden (windows, a full-screen app, another Space); one option covers both rows |
+| Desktop covered | A maximized window is on the monitor | (same as above) |
+| On battery | AC unplugged or Battery Saver on | On battery, or Low Power Mode |
+| Locked | Workstation locked, or a Remote Desktop session | Screen locked, or another user's session in front |
+| Tray → Pause animations | Manual, all monitors | Manual, all monitors |
+| Keep awake is on | (macOS only) | No input for 10 minutes, so an always-on screen isn't animating all night |
 
-Ignored when checking coverage: our own windows, the shell desktop, cloaked windows,
+Ignored when checking coverage on Windows: our own windows, the shell desktop, cloaked windows,
 minimized windows and click-through/tool overlays (like the GPU driver overlay).
 
 ### Launch and startup
 
 - **Opening Deskwave opens Settings,** from the Start menu or a shortcut, so nobody has to hunt
   for the tray icon.
-- **One instance per user session** (mutex `Local\Deskwave.SingleInstance`). A second launch
-  signals the running one (event `Local\Deskwave.ShowSettings`) to show Settings, then exits.
-- **Start at sign-in is opt-in.** On first run Settings asks once. If the user agrees,
-  `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` gets the value `Deskwave` =
-  `"<exe>" --background`. `--background` starts without opening Settings. It can be switched
-  under General at any time.
+- **One instance per user session.**
+  - Windows: mutex `Local\Deskwave.SingleInstance`. A second launch signals the running one
+    (event `Local\Deskwave.ShowSettings`) to show Settings, then exits.
+  - macOS: opening the app again from Finder, Launchpad or the Dock reaches the running copy as
+    `RunEvent::Reopen`, which shows Settings. A second process started another way finds the
+    `flock` on `$TMPDIR/app.deskwave.desktop.lock` held and exits.
+- **Start at sign-in is opt-in.** On first run Settings asks once. If the user agrees:
+  - Windows: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` gets the value `Deskwave` =
+    `"<exe>" --background`;
+  - macOS: a LaunchAgent, `~/Library/LaunchAgents/app.deskwave.desktop.plist`, runs
+    `<exe> --background` (macOS shows it under Login Items as a background item).
+
+  `--background` starts without opening Settings. It can be switched under General at any time.
 - **Upgrade from ColorBy:** on start, `%APPDATA%\ColorBy` is moved to `%APPDATA%\Deskwave`,
   built-in ids `colorby.*` become `deskwave.*`, and the old `ColorBy` Run value is removed.
 
@@ -118,19 +145,78 @@ minimized windows and click-through/tool overlays (like the GPU driver overlay).
   - It pauses with the wallpaper, and reduced motion shows the still version.
 - **Gradients are drawn by the host page,** not a mod, so they need no sandbox or permissions.
 
+### Albums
+
+- **Made in Settings → Wallpaper → New album** and stored in `config.json` under `albums` (at
+  most 50). A monitor's wallpaper can then be `{ "kind": "album", "id": … }`.
+
+  ```json
+  { "id": "a1", "name": "Summer", "items": ["beach.mp4", "sunset.jpg"], "interval": 30, "order": "shuffle", "layout": "collage" }
+  ```
+
+- **Validated in Rust:** a trimmed name of 1-60 characters; 1-200 items, each a plain file name
+  of a video or image (no folders, no `..`); `interval` (seconds a photo stays up) is one of 5,
+  10, 30, 60, 300, 900, 1800 or 3600; `order` is `inorder` or `shuffle`; `layout` is `single` or
+  `collage`. Saving drops items that are no longer in the wallpapers folder.
+- **Playing** (`ui/js/album.js`, also used for the live preview in Settings):
+  - photos stay up for `interval` seconds; videos play to the end (a single-video album loops);
+  - each tile crossfades between two layers, so at most two items per tile are loaded; reduced
+    motion swaps without fading;
+  - a collage shows up to four tiles, each starting at a different point in the album and
+    changing at a different moment;
+  - files that are missing or unreadable are skipped, and after a whole round of failures the
+    tile waits 30 s before trying again;
+  - pausing stops videos and photo timers and keeps the remaining time.
+- **Deleting an album** doesn't delete its files; monitors that used it go back to Aurora.
+
+### Drag and drop
+
+- **What can be dropped onto Settings:** videos and images (copied into the wallpapers folder,
+  and into the album being edited, if any) or, on the Mods page, mod folders (copied into the
+  mods folder, where they stay off until approved, like any new mod).
+- **The page never names the paths.** Rust records the paths from the OS drop event
+  (`WindowEvent::DragDrop`), which reaches Rust before the page hears of it. The page then calls
+  `drop_import` with only a target (`wallpapers` or `mods`). So the page cannot make Deskwave
+  copy files of its choosing. Paths are used once and expire after 60 s.
+- **Copying** (`deskwave_core::files`, unit-tested):
+  - media: only regular files with a video or image extension and a plain name; never
+    overwrites, picking `name (2).ext` instead;
+  - mods: only a folder with a `manifest.json` at its top; symbolic links are left out, and
+    folders over 2,000 files, 100 MB or 16 levels deep are refused, leaving nothing behind;
+  - at most 500 paths per drop.
+- **Tauri adds dropped paths to the asset protocol scope** for the session. Deskwave doesn't use
+  that (it serves only the copies in its own folder); mod pages can't use the asset protocol at
+  all (their CSP allows only their own folder).
+
+### Keeping awake (macOS)
+
+- **Off by default.** General → Keep awake, or the menu bar icon's **Keep screen awake** item:
+  - **Keep the screen on:** an IOKit `PreventUserIdleDisplaySleep` assertion (the Mac stays
+    awake too);
+  - **Keep the Mac awake:** `PreventUserIdleSystemSleep`; the screen may turn off.
+- The assertion is named "Deskwave: Keep awake is on", so it shows in Activity Monitor and
+  `pmset -g assertions`. It's released when turned off and ends with the process.
+- The choice is saved (`keep_awake` in `config.json`) and applied again at start.
+- Closing a MacBook's lid still sleeps it unless it's in clamshell mode with power and an
+  external display; Settings says so.
+- While it's on, wallpapers pause after 10 minutes without input (see Pausing).
+
 ### Languages
 
 - **Supported:** English, Ukrainian, French, Dutch, German, Polish and Spanish
   (`en`, `uk`, `fr`, `nl`, `de`, `pl`, `es`).
 - **Rust picks the language:**
   1. the user's choice under General → Language;
-  2. otherwise the first supported Windows display language (`GetUserPreferredUILanguages`);
+  2. otherwise the first supported system language (Windows: `GetUserPreferredUILanguages`;
+     macOS: `CFLocaleCopyPreferredLanguages`);
   3. otherwise English.
 - **Host pages** receive `lang` from their `*_get` command:
   - texts live in `ui/js/strings.js`;
   - plurals use `Intl.PluralRules`;
   - dates, times and units use `Intl`.
 - **The tray menu** comes from `deskwave_core::i18n`.
+- **macOS wording:** where a text names Windows things (the taskbar, Win+D, "maximized"), a
+  `<key>@mac` variant replaces it on a Mac (`setPlatform` in `ui/js/i18n.js`).
 - **Mods** receive the language too:
   - a manifest can carry `translations` of its name and description;
   - the SDK's `translate` and `localize` helpers do the rest (see SDK).
@@ -197,13 +283,16 @@ Approval:
 2. **CSP on every mod file.** Scripts, styles, images, fonts and media may only come from the
    mod's own folder or the SDK. No inline scripts, no `eval`, `connect-src 'none'`, no
    frames, no workers, no forms.
-3. **Host page CSP** has `frame-src http://dwmod.localhost`, so a mod frame cannot navigate
-   itself anywhere else.
+3. **Host page CSP** has `frame-src http://dwmod.localhost dwmod:` (the Windows and macOS forms
+   of the mod origin), so a mod frame cannot navigate itself anywhere else.
 4. **No IPC.** Tauri's IPC is only injected into our host pages. Each host page has its own
    capability file listing exactly the commands it may call.
-5. **Dead proxy.** Every WebView2 starts with `--proxy-server=127.0.0.1:9` (nothing
-   listens there), plus WebRTC limited to proxied UDP and background networking off. If a
-   CSP gap appeared, a request would still have nowhere to go.
+5. **Dead proxy.** If a CSP gap appeared, a request would still have nowhere to go:
+   - Windows: every WebView2 starts with `--proxy-server=127.0.0.1:9` (nothing listens there),
+     plus WebRTC limited to proxied UDP and background networking off;
+   - macOS 14+: WebKit's shared data store gets a proxy on 127.0.0.1:9, and WebRTC is turned
+     off in every web view's preferences (`platform::harden_webview`). These calls are looked
+     up at run time; on macOS 12-13 the proxy isn't available, so layers 1-4 and 6-7 carry it.
 6. **Permissions-Policy** denies camera, microphone, geolocation, display capture and USB/HID/serial.
 7. **Validated bridge.** Mods talk to the host only through a `MessagePort` handed over at
    load. The host checks the method and permission on every request. Rust re-validates
@@ -272,18 +361,20 @@ radius, shadow), so all widgets match. Light/dark: use `prefers-color-scheme`.
 
 ## Data
 
-Everything lives in `%APPDATA%\Deskwave\`:
+Everything lives in `%APPDATA%\Deskwave\` on Windows and
+`~/Library/Application Support/Deskwave/` on macOS:
 
 | Path | What |
 |---|---|
-| `config.json` | Layouts, wallpapers, gradients, approvals, the internet switch, language, pause settings. Written atomically. A corrupt file is moved to `config.json.bad` and defaults are used. |
+| `config.json` | Layouts, wallpapers, gradients, albums, approvals, the internet switch, language, pause settings, keep awake. Written atomically. A corrupt file is moved to `config.json.bad` and defaults are used. |
 | `storage\<widget-id>.json` | Each widget's key-value store (e.g. note text). |
 | `mods\` | User mods. |
 | `wallpapers\` | Video (`.mp4`, `.webm`) and image (`.gif`, `.png`, `.jpg`, `.webp`, `.avif`, `.apng`) wallpapers. |
 
-The setup.exe uninstaller removes the Run value. If the user ticks "Delete the application data",
+On Windows, the setup.exe uninstaller removes the Run value. If the user ticks "Delete the application data",
 it also removes `config.json` and `storage\` (`src-tauri/installer/hooks.nsh`), but never `mods\`
-or `wallpapers\`, which hold the user's own files. Deleting the whole folder resets Deskwave.
+or `wallpapers\`, which hold the user's own files. On macOS, the README tells users to turn off
+start at sign-in before dragging the app to the Trash. Deleting the whole folder resets Deskwave.
 
 ## Threat model (summary)
 
@@ -298,6 +389,8 @@ or `wallpapers\`, which hold the user's own files. Deleting the whole folder res
 | Supply chain | Few crates, lockfiles committed, no npm runtime deps, CI builds from source |
 | Tampered download | Releases built on GitHub's runners from a tag, with `SHA256SUMS.txt` and a signed build provenance attestation (`gh attestation verify`) |
 | Installer looks like a dropper | Installer embeds Microsoft's signed WebView2 setup instead of downloading one; no admin rights, services or autostart without consent |
+| A page makes Deskwave copy files | Drop imports take paths only from the OS drop event, never from the page; only media files or mod folders, with size limits and no links |
+| A Mac is kept awake without the user knowing | Off by default; a named power assertion visible in Activity Monitor and `pmset`; released when turned off or on quit |
 
 ## Roadmap
 
@@ -314,7 +407,7 @@ or `wallpapers\`, which hold the user's own files. Deleting the whole folder res
   - start with Windows, on by default and switchable in Settings;
   - opening Deskwave again opens Settings;
   - Fluent controls in the mod SDK.
-- **v0.3 (now):**
+- **v0.3:**
   - renamed from ColorBy to Deskwave, with automatic data migration;
   - gradient creator: linear, radial and flow, still or moving;
   - seven languages, for the app, tray and built-in widgets, plus translation helpers for mods;
@@ -325,6 +418,12 @@ or `wallpapers\`, which hold the user's own files. Deleting the whole folder res
   - installers open with a warning page: only the official Releases page is safe, no warranty,
     then the license (`scripts/installer-license.mjs`);
   - one download zip with clearly named folders and a READ ME FIRST file (`scripts/package.mjs`).
+- **v0.4 (now):**
+  - macOS version: universal app for Apple Silicon and Intel, menu bar icon, LaunchAgent for
+    sign-in, disk image with a READ ME FIRST file;
+  - keep awake on macOS (off by default): screen on, or the Mac only;
+  - albums: videos and photos taking turns, one at a time or as a collage;
+  - drag and drop of videos, photos and mod folders onto Settings.
 - **Later:**
   - mod packaging (`.zip` import) and a mod author guide;
   - per-widget settings UI;
@@ -332,5 +431,6 @@ or `wallpapers\`, which hold the user's own files. Deleting the whole folder res
   - widget themes;
   - a global hotkey for edit mode;
   - album art for Now playing;
-  - a code-signing certificate for the installers;
+  - a code-signing certificate for the installers and Apple notarization;
+  - reordering album items by dragging;
   - a translated installer.

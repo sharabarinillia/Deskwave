@@ -20,7 +20,7 @@ jobs:
       - run: cargo clippy -p deskwave-core --all-targets --locked -- -D warnings
 
   windows:
-    name: Build installer (Windows)
+    name: Build installers (Windows)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
@@ -36,4 +36,24 @@ jobs:
         with:
           name: Deskwave-Windows
           path: dist/Deskwave-Windows/
+          if-no-files-found: error
+
+  macos:
+    name: Build app (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - run: npm ci
+      - run: cargo clippy -p deskwave --all-targets --locked -- -D warnings
+      # One app for Apple Silicon and Intel Macs.
+      - run: npx tauri build --target universal-apple-darwin --bundles app
+      - run: node scripts/package.mjs target/universal-apple-darwin/release/bundle
+      - uses: actions/upload-artifact@v6
+        with:
+          name: Deskwave-macOS
+          path: dist/Deskwave-macOS.dmg
           if-no-files-found: error

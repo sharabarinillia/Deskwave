@@ -1,14 +1,13 @@
 //! The windows Deskwave shows: per monitor a wallpaper and a widget layer, plus Settings.
 
-use crate::desktop;
+use crate::platform;
 use crate::state::{AppState, Monitor};
 use deskwave_core::sandbox::BROWSER_ARGS;
 use std::sync::atomic::Ordering::SeqCst;
 use tauri::{
-    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindowBuilder,
-    Window, WindowEvent,
+    AppHandle, DragDropEvent, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl,
+    WebviewWindowBuilder, Window, WindowEvent,
 };
-use windows::Win32::Foundation::RECT;
 
 pub fn label(kind: &str, generation: u32, index: usize) -> String {
     format!("{kind}-g{generation}-{index}")
@@ -66,7 +65,7 @@ pub fn rebuild(app: &AppHandle) {
             eprintln!("wallpaper window {i} failed: {e}");
         }
     }
-    let owner = desktop::desktop_owner();
+    let owner = platform::desktop_owner();
     *state.owner.lock().unwrap() = owner;
     for (i, m) in monitors.iter().enumerate() {
         if let Err(e) = create_widgets(app, &label("widgets", generation, i), m, owner) {
@@ -89,14 +88,8 @@ fn layer_builder<'a>(app: &'a AppHandle, label: &str, page: &str) -> WebviewWind
 
 fn create_wallpaper(app: &AppHandle, label: &str, m: &Monitor) -> tauri::Result<()> {
     let window = layer_builder(app, label, "wallpaper.html").build()?;
-    let rect = RECT {
-        left: m.rect.0,
-        top: m.rect.1,
-        right: m.rect.0 + m.rect.2 as i32,
-        bottom: m.rect.1 + m.rect.3 as i32,
-    };
-    // Shown by attach_wallpaper via Win32: tao's show() would restore the popup styles.
-    if let Err(e) = desktop::attach_wallpaper(window.hwnd()?.0 as isize, rect) {
+    platform::harden_webview(&window);
+    if let Err(e) = platform::place_wallpaper(&window, m) {
         eprintln!("attaching wallpaper to the desktop failed: {e}");
     }
     Ok(())
@@ -104,18 +97,11 @@ fn create_wallpaper(app: &AppHandle, label: &str, m: &Monitor) -> tauri::Result<
 
 fn create_widgets(app: &AppHandle, label: &str, m: &Monitor, owner: Option<isize>) -> tauri::Result<()> {
     let window = layer_builder(app, label, "widgets.html").transparent(true).build()?;
+    platform::harden_webview(&window);
     window.set_position(PhysicalPosition::new(m.work.0, m.work.1))?;
     window.set_size(PhysicalSize::new(m.work.2, m.work.3))?;
     window.set_ignore_cursor_events(true)?;
-    let hwnd = window.hwnd()?.0 as isize;
-    if let Some(owner) = owner {
-        desktop::set_owner(hwnd, owner);
-    }
-    window.show()?;
-    if let Some(owner) = owner {
-        desktop::sink(hwnd, owner);
-    }
-    Ok(())
+    platform::place_widgets(&window, owner)
 }
 
 /// Edit mode lifts the widget layers above all windows; leaving it sinks them back.
@@ -129,18 +115,18 @@ pub fn set_editing(app: &AppHandle, on: bool) {
         if !label.starts_with("widgets-") {
             continue;
         }
-        let _ = window.set_always_on_top(on);
+        platform::set_editing(&window, on, owner);
         if on && label == self::label("widgets", generation, primary) {
             let _ = window.set_focus(); // so Esc reaches it
-        }
-        if let (false, Some(owner), Ok(hwnd)) = (on, owner, window.hwnd()) {
-            desktop::sink(hwnd.0 as isize, owner);
         }
     }
     let _ = app.emit("edit-mode", on);
 }
 
 pub fn open_settings(app: &AppHandle) {
+    // A Dock icon (and Cmd-Tab) only while Settings is open.
+    #[cfg(target_os = "macos")]
+    let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
     if let Some(window) = app.get_webview_window("settings") {
         let _ = window.unminimize();
         let _ = window.show();
@@ -154,8 +140,9 @@ pub fn open_settings(app: &AppHandle) {
         .center()
         .additional_browser_args(BROWSER_ARGS)
         .build();
-    if let Err(e) = built {
-        eprintln!("settings window failed: {e}");
+    match built {
+        Ok(window) => platform::harden_webview(&window),
+        Err(e) => eprintln!("settings window failed: {e}"),
     }
 }
 
@@ -172,9 +159,19 @@ pub fn on_window_event(window: &Window, event: &WindowEvent) {
         WindowEvent::Focused(true) if label.starts_with("widgets-") => {
             let state = window.state::<AppState>();
             let owner = *state.owner.lock().unwrap();
-            if let (false, Some(owner), Ok(hwnd)) = (state.editing.load(SeqCst), owner, window.hwnd()) {
-                desktop::sink(hwnd.0 as isize, owner);
+            if let (false, Some(webview)) = (state.editing.load(SeqCst), window.get_webview_window(label)) {
+                platform::sink(&webview, owner);
             }
+        }
+        // Remember what the user dropped onto Settings. The page then asks to import it, but
+        // never names paths itself, so it cannot make Deskwave copy files of its choosing.
+        // This handler runs before the page hears about the drop.
+        WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }) if label == "settings" => {
+            *window.state::<AppState>().dropped.lock().unwrap() = Some((paths.clone(), std::time::Instant::now()));
+        }
+        #[cfg(target_os = "macos")]
+        WindowEvent::Destroyed if label == "settings" => {
+            let _ = window.app_handle().set_activation_policy(tauri::ActivationPolicy::Accessory);
         }
         _ => {}
     }

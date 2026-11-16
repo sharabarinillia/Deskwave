@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "settings",
-  "description": "Settings window: wallpapers and gradients, mod approval, internet switch, language, startup, pause options, fixed links and data folders.",
+  "description": "Settings window: wallpapers, gradients and albums, dropped files and mod folders, mod approval, internet switch, language, startup, keeping awake (macOS), pause options, fixed links and data folders.",
   "windows": [
     "settings"
   ],
@@ -19,6 +19,10 @@
     "allow-set-language",
     "allow-gradient-save",
     "allow-gradient-delete",
+    "allow-album-save",
+    "allow-album-delete",
+    "allow-drop-import",
+    "allow-set-keep-awake",
     "allow-open-link"
   ]
 }

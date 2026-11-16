@@ -2,6 +2,7 @@
 //! here so it can be reviewed in one place and tested on any OS.
 
 pub mod config;
+pub mod files;
 pub mod i18n;
 pub mod manifest;
 pub mod net;

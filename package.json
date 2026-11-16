@@ -1,7 +1,7 @@
 {
   "name": "deskwave",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Build tooling only. The app ships no npm packages.",
   "scripts": {
     "tauri": "tauri",

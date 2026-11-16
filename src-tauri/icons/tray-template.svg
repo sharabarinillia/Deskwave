@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 22 22">
+  <!-- macOS menu bar icon (template image): only the shape's opacity is used. -->
+  <g fill="none" stroke="#000" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="2" y="3" width="18" height="13" rx="2.6"/>
+    <path d="M4.8 11.6C6.9 8.9 9.1 8.9 11 10.6S15.1 12.6 17.2 9.6"/>
+    <path d="M8.5 19.2h5M11 16.2v3"/>
+  </g>
+</svg>

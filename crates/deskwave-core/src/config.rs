@@ -22,6 +22,10 @@ pub struct Config {
     pub widgets: Vec<Widget>,
     /// Gradient wallpapers the user made.
     pub gradients: Vec<Gradient>,
+    /// Albums: videos and photos that take turns as the wallpaper.
+    pub albums: Vec<Album>,
+    /// macOS: keeps the screen or the Mac awake. Off by default.
+    pub keep_awake: KeepAwake,
     /// Mod id → what the user approved.
     pub grants: BTreeMap<String, Grant>,
 }
@@ -50,6 +54,65 @@ pub enum Wallpaper {
     File { name: String },
     /// One of `Config::gradients`.
     Gradient { id: String },
+    /// One of `Config::albums`.
+    Album { id: String },
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum KeepAwake {
+    #[default]
+    Off,
+    /// The screen stays on, so the Mac does too.
+    Screen,
+    /// The screen may turn off, but the Mac doesn't go to sleep.
+    System,
+}
+
+pub const MAX_ALBUMS: usize = 50;
+pub const MAX_ALBUM_ITEMS: usize = 200;
+/// How long a photo stays up, in seconds. Videos play to the end.
+pub const ALBUM_INTERVALS: [u32; 8] = [5, 10, 30, 60, 300, 900, 1800, 3600];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AlbumOrder {
+    InOrder,
+    Shuffle,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum AlbumLayout {
+    /// One video or photo at a time, filling the display.
+    Single,
+    /// Up to four at once in a grid, each taking its own turns.
+    Collage,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct Album {
+    pub id: String,
+    pub name: String,
+    /// File names inside the wallpapers folder, in play order.
+    pub items: Vec<String>,
+    /// Seconds each photo stays up; one of `ALBUM_INTERVALS`.
+    pub interval: u32,
+    pub order: AlbumOrder,
+    pub layout: AlbumLayout,
+}
+
+impl Album {
+    pub fn valid(&self) -> bool {
+        let name = self.name.trim();
+        valid_widget_id(&self.id)
+            && (1..=60).contains(&name.chars().count())
+            && name.len() == self.name.len()
+            && !self.name.chars().any(char::is_control)
+            && (1..=MAX_ALBUM_ITEMS).contains(&self.items.len())
+            && self.items.iter().all(|n| crate::files::valid_file_name(n) && crate::files::is_media(n))
+            && ALBUM_INTERVALS.contains(&self.interval)
+    }
 }
 
 pub const MAX_GRADIENTS: usize = 50;
@@ -254,6 +317,39 @@ mod tests {
         assert!(!Gradient { id: "../x".into(), ..g.clone() }.valid());
         let json = serde_json::to_string(&Wallpaper::Gradient { id: "g1".into() }).unwrap();
         assert_eq!(json, r#"{"kind":"gradient","id":"g1"}"#);
+    }
+
+    #[test]
+    fn albums_are_validated() {
+        let a = Album {
+            id: "a1".into(),
+            name: "Holiday".into(),
+            items: vec!["beach.mp4".into(), "sunset.jpg".into()],
+            interval: 30,
+            order: AlbumOrder::Shuffle,
+            layout: AlbumLayout::Collage,
+        };
+        assert!(a.valid());
+        assert!(!Album { items: vec![], ..a.clone() }.valid(), "empty");
+        assert!(!Album { items: vec!["../secret.jpg".into()], ..a.clone() }.valid(), "path");
+        assert!(!Album { items: vec!["notes.txt".into()], ..a.clone() }.valid(), "not media");
+        assert!(!Album { items: vec!["a.jpg".into(); MAX_ALBUM_ITEMS + 1], ..a.clone() }.valid(), "too many");
+        assert!(!Album { interval: 7, ..a.clone() }.valid(), "interval");
+        assert!(!Album { name: " ".into(), ..a.clone() }.valid(), "blank name");
+        assert!(!Album { name: " padded ".into(), ..a.clone() }.valid(), "untrimmed");
+        assert!(!Album { name: "x".repeat(61), ..a.clone() }.valid(), "long name");
+        let json = serde_json::to_string(&a).unwrap();
+        assert!(json.contains(r#""order":"shuffle""#) && json.contains(r#""layout":"collage""#));
+        let json = serde_json::to_string(&Wallpaper::Album { id: "a1".into() }).unwrap();
+        assert_eq!(json, r#"{"kind":"album","id":"a1"}"#);
+    }
+
+    #[test]
+    fn keep_awake_is_off_by_default() {
+        assert_eq!(Config::default().keep_awake, KeepAwake::Off);
+        let loaded: Config = serde_json::from_str(r#"{"keep_awake":"system"}"#).unwrap();
+        assert_eq!(loaded.keep_awake, KeepAwake::System);
+        assert_eq!(serde_json::to_string(&KeepAwake::Screen).unwrap(), r#""screen""#);
     }
 
     #[test]

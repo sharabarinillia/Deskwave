@@ -27,7 +27,7 @@ pub struct Paths {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Monitor {
-    /// Stable-ish id from Windows, e.g. `\\.\DISPLAY1`; the key in config.json.
+    /// Stable-ish id from the OS, e.g. `\\.\DISPLAY1`; the key in config.json.
     pub key: String,
     pub primary: bool,
     /// Physical pixels: (x, y, width, height).
@@ -73,7 +73,9 @@ pub struct AppState {
     pub media: Mutex<NowPlaying>,
     pub media_actions: Mutex<Option<Sender<Action>>>,
     pub net_log: Mutex<VecDeque<NetEvent>>,
-    /// Windows display languages, read once at startup.
+    /// Paths last dragged over Settings by the user, and when; set from the OS drop event.
+    pub dropped: Mutex<Option<(Vec<PathBuf>, Instant)>>,
+    /// System display languages, read once at startup.
     system_languages: Vec<String>,
     net_recent: Mutex<HashMap<String, VecDeque<Instant>>>,
 }
@@ -121,7 +123,8 @@ impl AppState {
             media: Mutex::default(),
             media_actions: Mutex::default(),
             net_log: Mutex::default(),
-            system_languages: crate::desktop::ui_languages(),
+            dropped: Mutex::default(),
+            system_languages: crate::platform::ui_languages(),
             net_recent: Mutex::default(),
         };
         state.rescan_mods();

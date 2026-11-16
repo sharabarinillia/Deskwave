@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Deskwave",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "identifier": "app.deskwave.desktop",
   "build": {
     "frontendDist": "../ui",
@@ -28,7 +28,8 @@
         "enable": true,
         "scope": []
       }
-    }
+    },
+    "macOSPrivateApi": true
   },
   "bundle": {
     "active": true,
@@ -43,6 +44,7 @@
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
+      "icons/icon.icns",
       "icons/icon.ico"
     ],
     "resources": {
@@ -58,9 +60,13 @@
         "installerHooks": "installer/hooks.nsh"
       }
     },
+    "macOS": {
+      "minimumSystemVersion": "12.0",
+      "signingIdentity": "-"
+    },
     "publisher": "sharabarinillia",
     "homepage": "https://github.com/sharabarinillia/Deskwave",
     "licenseFile": "installer/license.txt",
-    "longDescription": "Animated wallpapers and desktop widgets for Windows. Offline by default."
+    "longDescription": "Animated wallpapers and desktop widgets for Windows and macOS. Offline by default."
   }
 }

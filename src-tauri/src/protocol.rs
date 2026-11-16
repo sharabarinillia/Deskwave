@@ -1,4 +1,4 @@
-//! `dwmod` protocol (`http://dwmod.localhost/<mod-id>/<path>` and `/_sdk/<path>`).
+//! `dwmod` protocol (`<MOD_ORIGIN>/<mod-id>/<path>` and `/_sdk/<path>`; see `sandbox::MOD_ORIGIN`).
 //! Serves only approved mods, only files inside their folder, always with the sandbox CSP.
 
 use crate::state::AppState;

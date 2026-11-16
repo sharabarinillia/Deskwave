@@ -1,0 +1,22 @@
+/* Albums (ui/js/album.js): used by the wallpaper and by the album preview in Settings. */
+.album {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  gap: 2px;
+  background: #000;
+}
+.album-2 { grid-template-columns: 1fr 1fr; }
+.album-3, .album-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.album-3 .album-tile:first-child { grid-row: span 2; }
+.album-tile { position: relative; overflow: hidden; min-width: 0; min-height: 0; }
+.album-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 700ms ease;
+}
+.album-media.shown { opacity: 1; }

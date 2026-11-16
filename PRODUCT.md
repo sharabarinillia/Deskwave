@@ -4,8 +4,8 @@
 
 web
 
-(Desktop app for Windows 10/11; every surface is HTML/CSS rendered in WebView2 inside Tauri, so web
-rules apply, but it must feel native to Windows 11.)
+(Desktop app for Windows 10/11 and macOS 12+; every surface is HTML/CSS rendered in WebView2 or
+WKWebView inside Tauri, so web rules apply. The look follows Windows 11 (Fluent) on both.)
 
 ## Stack
 
@@ -41,7 +41,8 @@ permissions. Built-in widgets use the same mod API as community ones.
 
 ## Capabilities and Constraints
 
-- Windows 10 and 11, multi-monitor, per-monitor DPI.
+- Windows 10 and 11, and macOS 12+ (Apple Silicon and Intel); multi-monitor, per-monitor DPI.
+- macOS extra: keep the screen or the Mac awake for overnight work (off by default).
 - Wallpapers: built-in animated presets, video files, GIF/images, and interactive web scenes (mods).
 - Mods: folder with `manifest.json` plus web files, sandboxed. Permissions are approved in Settings.
 - Undecided: mod zip import.

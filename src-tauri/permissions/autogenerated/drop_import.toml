@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-drop-import"
+description = "Enables the drop_import command without any pre-configured scope."
+commands.allow = ["drop_import"]
+
+[[permission]]
+identifier = "deny-drop-import"
+description = "Denies the drop_import command without any pre-configured scope."
+commands.deny = ["drop_import"]

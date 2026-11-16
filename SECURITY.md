@@ -14,8 +14,11 @@ security model is part of the product. The full design is in
     to addresses on the user's own network.
 - **Mods** run in a sandbox. They cannot read files, other mods, the network or the app's internal
   commands, and they stay off until the user approves them and the permissions they ask for.
-- **No hidden persistence:** Deskwave starts at sign-in only if the user says yes, needs no
-  administrator rights, and installs no services, scheduled tasks or drivers.
+- **No hidden persistence:** Deskwave starts at sign-in only if the user says yes (a Run value on
+  Windows, a LaunchAgent on macOS), needs no administrator rights, and installs no services,
+  scheduled tasks or drivers.
+- **Keeping awake (macOS) is off by default.** When on, it's a named power assertion that macOS
+  shows in Activity Monitor and `pmset -g assertions`, released when turned off or on quit.
 
 ## Verifying a download
 
@@ -24,19 +27,22 @@ Only download Deskwave from this repository's
 [`.github/workflows/release.yml`](.github/workflows/release.yml) on GitHub's runners, from a
 tagged commit. It comes with:
 
-- `SHA256SUMS.txt`: compare it with `(Get-FileHash <file> -Algorithm SHA256).Hash`;
+- `SHA256SUMS.txt`: compare it with `(Get-FileHash <file> -Algorithm SHA256).Hash` on Windows,
+  or `shasum -a 256 <file>` on a Mac;
 - a signed build provenance attestation: check it with
   `gh attestation verify <file> --repo sharabarinillia/Deskwave`.
 
-The installers are not code-signed yet, so SmartScreen and sometimes Microsoft Defender warn about
-them. The README explains
-[what to do](README.md#windows-defender-or-smartscreen-warns-about-the-file). Never disable your
-antivirus for Deskwave.
+The Windows installers are not code-signed yet, so SmartScreen and sometimes Microsoft Defender
+warn about them. The Mac app is signed but not notarized by Apple, so macOS asks for confirmation
+the first time. The README explains what to do
+([Windows](README.md#windows-defender-or-smartscreen-warns-about-the-file),
+[macOS](README.md#macos-says-it-cant-check-deskwave)). Never disable your antivirus or Gatekeeper
+for Deskwave.
 
 ## Reporting a vulnerability
 
 Please report privately through GitHub's **Security → Report a vulnerability** form on this
-repository. Don't open a public issue. Include the steps to reproduce and the Windows version.
+repository. Don't open a public issue. Include the steps to reproduce and the Windows or macOS version.
 
 In scope, among others:
 
@@ -45,4 +51,5 @@ In scope, among others:
 - path traversal through the `dwmod` protocol;
 - any way for Deskwave to make a network request while offline;
 - any way for a mod to reach a host it wasn't approved for, or the user's local network;
-- a release file whose checksum or attestation doesn't match.
+- a release file whose checksum or attestation doesn't match;
+- any way for a page to make Deskwave copy or read a file the user didn't drop onto Settings.

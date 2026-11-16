@@ -30,6 +30,7 @@
   --success-bg: #dff6dd;
   --shadow-flyout: 0 8px 16px rgb(0 0 0 / 0.14);
   --r-control: 4px;
+  --r-tile: 6px;
   --r-overlay: 8px;
   --ease-out: cubic-bezier(0, 0, 0, 1);
 }
@@ -166,3 +167,4 @@ button { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; }
 }
+

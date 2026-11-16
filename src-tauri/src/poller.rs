@@ -1,23 +1,26 @@
 //! One background thread: click-through (30 Hz), pause/battery/theme (1 Hz), and a
 //! watchdog for monitor changes and Explorer restarts (every 3 s).
 
-use crate::desktop::{self, Power};
 use crate::layers::{self, label};
+use crate::platform::{self, Instance, Power};
 use crate::state::AppState;
 use crate::stats::Sampler;
+use deskwave_core::config::KeepAwake;
 use deskwave_core::manifest::Permission;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering::SeqCst;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter, Manager};
-use windows::Win32::Foundation::RECT;
 
-pub fn start(app: AppHandle, show_settings: isize) {
+/// While keeping awake, nobody may be watching all night: pause after this much idle time.
+const AWAKE_IDLE_PAUSE_SECS: u64 = 10 * 60;
+
+pub fn start(app: AppHandle, instance: Instance) {
     std::thread::spawn(move || {
         let mut ignoring = HashMap::new();
         let mut sampler = Sampler::default();
         let mut last_power = None;
-        let mut last_accent = desktop::accent_color();
+        let mut last_accent = platform::accent_color();
         let mut tick: u64 = 0;
         loop {
             std::thread::sleep(Duration::from_millis(33));
@@ -25,7 +28,7 @@ pub fn start(app: AppHandle, show_settings: isize) {
             click_through(&app, &mut ignoring);
             if tick.is_multiple_of(30) {
                 system(&app, &mut last_power, &mut last_accent);
-                if desktop::take_show_request(show_settings) {
+                if instance.take_show_request() {
                     let handle = app.clone();
                     let _ = app.run_on_main_thread(move || layers::open_settings(&handle));
                 }
@@ -45,8 +48,7 @@ pub fn start(app: AppHandle, show_settings: isize) {
 fn click_through(app: &AppHandle, ignoring: &mut HashMap<String, bool>) {
     let state = app.state::<AppState>();
     let editing = state.editing.load(SeqCst);
-    let (x, y) = desktop::cursor_pos();
-    let (x, y) = (x as f64, y as f64);
+    let (x, y) = platform::cursor_pos(app);
     let layers = state.hit_rects.lock().unwrap().clone();
     ignoring.retain(|label, _| layers.contains_key(label));
     for (label, rects) in layers {
@@ -63,27 +65,22 @@ fn click_through(app: &AppHandle, ignoring: &mut HashMap<String, bool>) {
 
 fn system(app: &AppHandle, last_power: &mut Option<Power>, last_accent: &mut String) {
     let state = app.state::<AppState>();
-    let options = state.config.lock().unwrap().pause;
+    let (options, awake) = {
+        let config = state.config.lock().unwrap();
+        (config.pause, config.keep_awake)
+    };
     let monitors = state.monitors.lock().unwrap().clone();
-    let power = desktop::power();
+    let power = platform::power();
 
-    let rects: Vec<RECT> = monitors
-        .iter()
-        .map(|m| RECT {
-            left: m.rect.0,
-            top: m.rect.1,
-            right: m.rect.0 + m.rect.2 as i32,
-            bottom: m.rect.1 + m.rect.3 as i32,
-        })
-        .collect();
     let coverage = if options.fullscreen || options.covered {
-        desktop::coverage(&rects)
+        platform::coverage(app, &monitors)
     } else {
-        vec![Default::default(); rects.len()]
+        vec![Default::default(); monitors.len()]
     };
     let everywhere = state.user_paused.load(SeqCst)
-        || (options.locked && desktop::session_inactive())
-        || (options.battery && (!power.on_ac || power.saver));
+        || (options.locked && platform::session_inactive())
+        || (options.battery && (!power.on_ac || power.saver))
+        || (awake != KeepAwake::Off && platform::idle_seconds() >= AWAKE_IDLE_PAUSE_SECS);
     let paused: Vec<bool> = coverage
         .iter()
         .map(|c| everywhere || (options.fullscreen && c.fullscreen) || (options.covered && c.maximized))
@@ -103,7 +100,7 @@ fn system(app: &AppHandle, last_power: &mut Option<Power>, last_accent: &mut Str
         *last_power = Some(power);
         let _ = app.emit("battery", power);
     }
-    let accent = desktop::accent_color();
+    let accent = platform::accent_color();
     if *last_accent != accent {
         let _ = app.emit("theme", &accent);
         *last_accent = accent;
@@ -129,7 +126,7 @@ fn watchdog(app: &AppHandle) {
         app.get_webview_window(&label("wallpaper", generation, i)).is_none()
             || app.get_webview_window(&label("widgets", generation, i)).is_none()
     });
-    let owner_changed = desktop::desktop_owner() != *state.owner.lock().unwrap();
+    let owner_changed = platform::desktop_owner() != *state.owner.lock().unwrap();
     let monitors = layers::read_monitors(app);
     let monitors_changed = monitors != *state.monitors.lock().unwrap();
     if missing || owner_changed || monitors_changed {

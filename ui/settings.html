@@ -5,6 +5,7 @@
   <title>Deskwave</title>
   <link rel="stylesheet" href="css/fluent.css">
   <link rel="stylesheet" href="css/settings.css">
+  <link rel="stylesheet" href="css/album.css">
   <script type="module" src="js/settings.js"></script>
 </head>
 <body>
@@ -24,8 +25,14 @@
   </nav>
 
   <main class="content">
+    <div class="drop-overlay" id="drop-overlay" hidden>
+      <div class="drop-card"><svg class="icon"><use href="img/icons.svg#i-add"/></svg><span id="drop-text"></span></div>
+    </div>
     <div class="infobar critical" id="notice" role="alert" hidden>
       <svg class="icon"><use href="img/icons.svg#i-warning"/></svg><span></span>
+    </div>
+    <div class="infobar success" id="drop-result" role="status" hidden>
+      <svg class="icon"><use href="img/icons.svg#i-check"/></svg><span></span>
     </div>
     <div class="infobar accent" id="startup-prompt" hidden>
       <svg class="icon"><use href="img/icons.svg#i-power"/></svg>
@@ -76,6 +83,44 @@
               <button class="btn subtle danger" id="gradient-delete" data-i18n="common.delete"></button>
             </div>
           </div>
+        </div>
+      </section>
+
+      <h2 id="albums-title" data-i18n="wallpaper.albums"></h2>
+      <p class="lede" data-i18n="wallpaper.albumsText"></p>
+      <div class="gallery" id="albums" role="radiogroup" aria-labelledby="albums-title"></div>
+      <section class="editor" id="album-editor" aria-labelledby="album-editor-title" hidden>
+        <h3 id="album-editor-title"></h3>
+        <div class="editor-body">
+          <div class="editor-preview" id="album-preview"></div>
+          <div class="editor-controls">
+            <div class="field">
+              <label class="field-label" for="album-name" data-i18n="album.name"></label>
+              <input class="text-input" id="album-name" maxlength="60" autocomplete="off">
+            </div>
+            <div class="field">
+              <div class="field-label" id="album-layout-label" data-i18n="album.layout"></div>
+              <div class="segmented" id="album-layout" role="radiogroup" aria-labelledby="album-layout-label"></div>
+            </div>
+            <div class="field">
+              <label class="field-label" for="album-interval" data-i18n="album.photoTime"></label>
+              <select class="select" id="album-interval"></select>
+            </div>
+            <div class="field">
+              <div class="field-label" id="album-order-label" data-i18n="album.order"></div>
+              <div class="segmented" id="album-order" role="radiogroup" aria-labelledby="album-order-label"></div>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label"><span id="album-pick-label" data-i18n="album.pick"></span> · <span id="album-count"></span></div>
+          <div class="field-hint" data-i18n="album.pickHint"></div>
+          <div class="album-picker" id="album-picker" role="group" aria-labelledby="album-pick-label"></div>
+        </div>
+        <div class="editor-actions">
+          <button class="btn primary" id="album-use" data-i18n="album.use"></button>
+          <button class="btn" id="album-cancel" data-i18n="common.cancel"></button>
+          <button class="btn subtle danger" id="album-delete" data-i18n="common.delete"></button>
         </div>
       </section>
 
@@ -165,6 +210,13 @@
       <h2 data-i18n="general.pauseTitle"></h2>
       <p class="lede" data-i18n="general.pauseLede"></p>
       <div class="group" id="pause-options"></div>
+
+      <div id="awake-section" hidden>
+        <h2 id="awake-title" data-i18n="awake.title"></h2>
+        <p class="lede" data-i18n="awake.lede"></p>
+        <div class="group" id="awake-options" role="radiogroup" aria-labelledby="awake-title"></div>
+        <p class="note" data-i18n="awake.note"></p>
+      </div>
     </section>
 
     <section class="page" id="page-privacy" aria-labelledby="h-privacy" hidden>

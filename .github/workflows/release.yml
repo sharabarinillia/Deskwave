@@ -1,9 +1,9 @@
 name: Release
 run-name: Release ${{ github.ref_name }}
 
-# Runs when a version tag such as v0.3.0 is pushed, or created by publishing a release with a new
-# tag on GitHub's Releases page. Builds both installers on GitHub's own
-# Windows machines, packages them with a READ ME FIRST file, publishes SHA-256 checksums and a
+# Runs when a version tag such as v0.4.0 is pushed, or created by publishing a release with a
+# new tag on GitHub's Releases page. Builds the Windows installers and the macOS app on GitHub's
+# own machines, packages them with a READ ME FIRST file, publishes SHA-256 checksums and a
 # signed build-provenance attestation, then publishes the release. Asset names stay the same
 # across versions, so .../releases/latest/download/Deskwave-Setup.exe always works.
 on:
@@ -14,13 +14,9 @@ permissions:
   contents: read
 
 jobs:
-  release:
-    name: Build and publish the release
+  windows:
+    name: Build for Windows
     runs-on: windows-latest
-    permissions:
-      contents: write      # create the release
-      id-token: write      # sign the attestation
-      attestations: write  # store the attestation
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -31,59 +27,97 @@ jobs:
       - run: cargo test --workspace --locked
       - run: npx tauri build
       - run: node scripts/package.mjs
-
-      - name: Zip the download and write checksums
+      - name: Zip the download
         shell: pwsh
+        run: Compress-Archive -Path dist/Deskwave-Windows -DestinationPath dist/Deskwave-Windows.zip
+      - uses: actions/upload-artifact@v6
+        with:
+          name: windows
+          path: |
+            dist/Deskwave-Setup.exe
+            dist/Deskwave.msi
+            dist/Deskwave-Windows.zip
+          if-no-files-found: error
+
+  macos:
+    name: Build for macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - run: npm ci
+      - run: npx tauri build --target universal-apple-darwin --bundles app
+      - run: node scripts/package.mjs target/universal-apple-darwin/release/bundle
+      - uses: actions/upload-artifact@v6
+        with:
+          name: macos
+          path: dist/Deskwave-macOS.dmg
+          if-no-files-found: error
+
+  publish:
+    name: Publish the release
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write      # create the release
+      id-token: write      # sign the attestation
+      attestations: write  # store the attestation
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Write checksums
+        working-directory: dist
         run: |
-          Compress-Archive -Path dist/Deskwave-Windows -DestinationPath dist/Deskwave-Windows.zip
-          'Deskwave-Setup.exe', 'Deskwave.msi', 'Deskwave-Windows.zip' | ForEach-Object {
-            '{0}  {1}' -f (Get-FileHash "dist/$_" -Algorithm SHA256).Hash.ToLower(), $_
-          } | Set-Content -Encoding ascii dist/SHA256SUMS.txt
-          Get-Content dist/SHA256SUMS.txt
+          sha256sum Deskwave-Setup.exe Deskwave.msi Deskwave-Windows.zip Deskwave-macOS.dmg > SHA256SUMS.txt
+          cat SHA256SUMS.txt
 
       # Attestations need a public repository (or GitHub Enterprise). Checked at run time, so
       # re-running this workflow after the repository goes public adds them to the release.
       - name: Check whether the repository is public
         id: repo
-        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          $private = gh api "repos/$env:GITHUB_REPOSITORY" --jq .private
-          "public=$($private -eq 'false')" >> $env:GITHUB_OUTPUT
+        run: echo "public=$(gh api "repos/$GITHUB_REPOSITORY" --jq '.private | not')" >> "$GITHUB_OUTPUT"
 
       - uses: actions/attest-build-provenance@v4
-        if: steps.repo.outputs.public == 'True'
+        if: steps.repo.outputs.public == 'true'
         with:
           subject-path: |
             dist/Deskwave-Setup.exe
             dist/Deskwave.msi
             dist/Deskwave-Windows.zip
+            dist/Deskwave-macOS.dmg
 
       - name: Publish the GitHub release
-        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          $PSNativeCommandUseErrorActionPreference = $false
-          $files = 'dist/Deskwave-Setup.exe', 'dist/Deskwave.msi', 'dist/Deskwave-Windows.zip', 'dist/SHA256SUMS.txt'
+          set -euo pipefail
+          files=(dist/Deskwave-Setup.exe dist/Deskwave.msi dist/Deskwave-Windows.zip dist/Deskwave-macOS.dmg dist/SHA256SUMS.txt)
           # The tag vX.Y.Z means version X.Y.Z, with notes in docs/releases/vX.Y.Z.md.
           # A stray dot after the v is ignored.
-          $version = $env:TAG -replace '^v\.?', ''
-          $notes = "docs/releases/v$version.md"
-          $about = @('--title', "Deskwave $version")
-          if (Test-Path $notes) { $about += @('--notes-file', $notes) }
-          else { Write-Output "::warning::$notes is missing, so the release notes were left as they are." }
-
-          gh release view $env:TAG *> $null
-          if ($LASTEXITCODE -eq 0) {
+          version="${TAG#v}"
+          version="${version#.}"
+          notes="docs/releases/v$version.md"
+          about=(--title "Deskwave $version")
+          if [ -f "$notes" ]; then
+            about+=(--notes-file "$notes")
+          else
+            echo "::warning::$notes is missing, so the release notes were left as they are."
+          fi
+          if gh release view "$TAG" > /dev/null 2>&1; then
             # Published on GitHub's Releases page (which also creates the tag), or a re-run.
             # Attach the files first, so a problem with the title or notes never blocks downloads.
-            gh release upload $env:TAG @files --clobber
-            if ($LASTEXITCODE -ne 0) { exit 1 }
-            gh release edit $env:TAG @about
-          } else {
-            if (-not (Test-Path $notes)) { $about += '--generate-notes' }
-            gh release create $env:TAG @files --verify-tag @about
-          }
+            gh release upload "$TAG" "${files[@]}" --clobber
+            gh release edit "$TAG" "${about[@]}"
+          else
+            [ -f "$notes" ] || about+=(--generate-notes)
+            gh release create "$TAG" "${files[@]}" --verify-tag "${about[@]}"
+          fi

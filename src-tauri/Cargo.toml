@@ -1,6 +1,6 @@
 [package]
 name = "deskwave"
-description = "Animated wallpapers and desktop widgets for Windows"
+description = "Animated wallpapers and desktop widgets for Windows and macOS"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -15,7 +15,15 @@ serde.workspace = true
 serde_json.workspace = true
 # Pinned: the private-address check plugs into ureq's semver-exempt resolver API.
 ureq = { version = "=3.5.2", default-features = false, features = ["rustls"] }
-tauri = { version = "2.12", features = ["tray-icon", "protocol-asset"] }
+# macos-private-api: transparent widget windows on macOS (also needs app.macOSPrivateApi).
+tauri = { version = "2.12", features = ["tray-icon", "protocol-asset", "macos-private-api"] }
+
+# All already part of Tauri's own macOS build: Core Foundation, Objective-C messaging, libc.
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"
+core-foundation-sys = "0.8"
+libc = "0.2"
+objc2 = "0.6"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = [

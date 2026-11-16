@@ -1,5 +1,6 @@
-// Translations for the host pages. Rust decides the language (the user's choice, else
-// Windows' display language) and passes it to every page.
+// Translations for the host pages. Rust decides the language (the user's choice, else the
+// system's display language) and passes it to every page. On a Mac, a key's `@mac` variant
+// (e.g. 'general.system@mac') replaces it where Windows wording wouldn't fit.
 import { STRINGS } from './strings.js';
 
 export const LANGUAGE_NAMES = {
@@ -13,8 +14,14 @@ export const LANGUAGE_NAMES = {
 };
 
 let lang = 'en';
+let mac = false;
 
 export const getLang = () => lang;
+
+/** `windows` or `macos`, from Rust. Call before `setLang` so the page is translated once. */
+export function setPlatform(platform) {
+  mac = platform === 'macos';
+}
 
 export function setLang(code) {
   lang = code in STRINGS ? code : 'en';
@@ -24,6 +31,7 @@ export function setLang(code) {
 
 /** `t('key', { n: 3, name: 'x' })`. Plural entries are objects keyed by Intl.PluralRules category. */
 export function t(key, params = {}) {
+  if (mac && `${key}@mac` in STRINGS.en) key = `${key}@mac`;
   let text = STRINGS[lang]?.[key] ?? STRINGS.en[key] ?? key;
   if (typeof text === 'object') {
     text = text[new Intl.PluralRules(lang).select(params.n ?? 0)] ?? text.other;

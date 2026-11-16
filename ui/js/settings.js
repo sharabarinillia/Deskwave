@@ -1,10 +1,12 @@
+import { mountAlbum } from './album.js';
 import { h, icon } from './dom.js';
 import { mountGradient } from './gradient.js';
-import { has, LANGUAGE_NAMES, list, setLang, t } from './i18n.js';
+import { has, LANGUAGE_NAMES, list, setLang, setPlatform, t } from './i18n.js';
 import { applyAccent } from './theme.js';
 
 const { invoke, convertFileSrc } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
+const { getCurrentWebview } = window.__TAURI__.webview;
 const $ = (id) => document.getElementById(id);
 
 const DEFAULT_WALLPAPER = 'deskwave.aurora';
@@ -14,6 +16,9 @@ const PAUSE_OPTIONS = [
   ['battery', 'battery'],
   ['locked', 'lock'],
 ];
+/** Seconds a photo stays up in an album; the same list Rust accepts. */
+const INTERVALS = [5, 10, 30, 60, 300, 900, 1800, 3600];
+const AWAKE = [['off', 'moon'], ['screen', 'display'], ['system', 'coffee']];
 const PALETTES = [
   ['#0f2027', '#203a43', '#2c5364'],
   ['#ff7e5f', '#feb47b'],
@@ -30,6 +35,8 @@ let galleryRenderers = [];
 let confirming = null;
 let draft = null;
 let draftPreview = null;
+let albumDraft = null;
+let albumPreview = null;
 
 // ---- shell ----
 
@@ -59,6 +66,7 @@ async function run(command, args) {
 
 async function load() {
   state = await run('settings_get');
+  setPlatform(state.platform);
   setLang(state.lang);
   applyAccent(state.accent);
   monitorIndex = Math.min(monitorIndex, Math.max(0, state.monitors.length - 1));
@@ -96,6 +104,7 @@ const gradientLabel = (g) => `${t(`gradient.${g.style}`)} · ${t(`gradient.${g.m
 
 function wallpaperName(wallpaper) {
   if (wallpaper?.kind === 'file') return wallpaper.name;
+  if (wallpaper?.kind === 'album') return state.albums.find((a) => a.id === wallpaper.id)?.name ?? t('wallpaper.unavailable');
   if (wallpaper?.kind === 'gradient') {
     const g = state.gradients.find((x) => x.id === wallpaper.id);
     return g ? gradientLabel(g) : t('wallpaper.unavailable');
@@ -186,8 +195,31 @@ function gradientTile(g) {
   return node;
 }
 
-function newGradientTile() {
-  const open = () => openEditor(null);
+/** A still of a file: the image itself, or a video's first frame. */
+function thumbnail(file) {
+  const src = convertFileSrc(file.path);
+  return file.video ? h('video', { src, muted: true, preload: 'metadata' }) : h('img', { src, alt: '', loading: 'lazy' });
+}
+
+const albumLabel = (a) => `${a.name} · ${t('album.count', { n: a.items.length })}`;
+
+function albumTile(a) {
+  const cover = a.items.map((name) => state.files.find((f) => f.name === name)).find(Boolean);
+  const media = cover ? thumbnail(cover) : h('span', { class: 'tile-placeholder' }, icon('album'));
+  const node = tile(albumLabel(a), { kind: 'album', id: a.id }, media);
+  node.append(h('button', {
+    class: 'edit',
+    'aria-label': `${t('gradient.edit')}: ${a.name}`,
+    title: t('gradient.edit'),
+    onclick: (event) => {
+      event.stopPropagation();
+      openAlbumEditor(a);
+    },
+  }, icon('edit')));
+  return node;
+}
+
+function newTile(label, open) {
   return h('div', {
     class: 'tile new',
     role: 'button',
@@ -198,12 +230,12 @@ function newGradientTile() {
       event.preventDefault();
       open();
     },
-  }, h('span', { class: 'tile-media' }, icon('add')), h('span', { class: 'tile-label' }, t('wallpaper.newGradient')));
+  }, h('span', { class: 'tile-media' }, icon('add')), h('span', { class: 'tile-label' }, label));
 }
 
 function renderGallery() {
   const presets = state.mods.filter((m) => m.kind === 'wallpaper' && m.url);
-  const key = JSON.stringify([state.lang, presets.map((m) => [m.url, m.name]), state.gradients, state.files]);
+  const key = JSON.stringify([state.lang, presets.map((m) => [m.url, m.name]), state.gradients, state.albums, state.files]);
   if (key !== galleryKey) {
     // Rebuild only when the choices change, so live previews keep running.
     galleryKey = key;
@@ -213,14 +245,14 @@ function renderGallery() {
       ? presets.map((m) => tile(m.name, { kind: 'mod', id: m.id },
           h('iframe', { src: m.url, sandbox: 'allow-scripts', referrerpolicy: 'no-referrer', loading: 'lazy', tabindex: '-1', 'aria-hidden': 'true', title: m.name })))
       : [h('p', { class: 'empty' }, t('wallpaper.noAnimated'))]));
-    $('gradients').replaceChildren(...state.gradients.map(gradientTile), newGradientTile());
+    $('gradients').replaceChildren(...state.gradients.map(gradientTile), newTile(t('wallpaper.newGradient'), () => openEditor(null)));
+    $('albums').replaceChildren(...state.albums.map(albumTile), newTile(t('wallpaper.newAlbum'), () => openAlbumEditor(null)));
     $('files').replaceChildren(...(state.files.length
-      ? state.files.map((name) => {
-          const src = convertFileSrc(`${state.wallpapersDir}\\${name}`);
-          const isVideo = /\.(mp4|webm)$/i.test(name);
-          const media = isVideo ? h('video', { src, muted: true, loop: true, preload: 'metadata' }) : h('img', { src, alt: '' });
-          const node = tile(name, { kind: 'file', name }, media);
-          if (isVideo) {
+      ? state.files.map((file) => {
+          const media = thumbnail(file);
+          if (file.video) media.loop = true;
+          const node = tile(file.name, { kind: 'file', name: file.name }, media);
+          if (file.video) {
             const play = () => media.play().catch(() => {});
             const stop = () => media.pause();
             node.addEventListener('pointerenter', play);
@@ -244,6 +276,7 @@ function renderChecks() {
 // ---- gradient editor ----
 
 function openEditor(g) {
+  if (albumDraft) closeAlbumEditor();
   draft = structuredClone(g ?? { id: '', colors: [...PALETTES[5]], style: 'flow', angle: 135, motion: 'slow' });
   $('editor-title').textContent = t(g ? 'gradient.titleEdit' : 'gradient.titleNew');
   $('gradient-delete').hidden = !g;
@@ -345,6 +378,175 @@ $('gradient-delete').addEventListener('click', async () => {
   await load();
 });
 
+// ---- album editor ----
+
+const duration = (seconds) => {
+  const [value, unit] = seconds >= 3600 ? [seconds / 3600, 'hour'] : seconds >= 60 ? [seconds / 60, 'minute'] : [seconds, 'second'];
+  return new Intl.NumberFormat(state.lang, { style: 'unit', unit, unitDisplay: 'long' }).format(value);
+};
+
+function openAlbumEditor(album) {
+  closeEditor();
+  albumDraft = structuredClone(album ?? { id: '', name: t('album.defaultName'), items: [], interval: 30, order: 'inorder', layout: 'single' });
+  $('album-editor-title').textContent = t(album ? 'album.titleEdit' : 'album.titleNew');
+  $('album-delete').hidden = !album;
+  $('album-name').value = albumDraft.name;
+  $('album-interval').replaceChildren(...INTERVALS.map((s) => h('option', { value: String(s) }, duration(s))));
+  $('album-interval').value = String(albumDraft.interval);
+  $('album-editor').hidden = false;
+  buildAlbumPicker();
+  renderAlbumEditor();
+  $('album-editor').scrollIntoView({ block: 'nearest' });
+  $('album-name').focus({ preventScroll: true });
+}
+
+function closeAlbumEditor() {
+  albumPreview?.destroy();
+  albumPreview = null;
+  albumDraft = null;
+  $('album-editor').hidden = true;
+}
+
+/** The draft's items as files, skipping any no longer in the wallpapers folder. */
+const draftFiles = () => albumDraft.items.map((name) => state.files.find((f) => f.name === name)).filter(Boolean);
+
+function choiceGroup(id, field, values) {
+  $(id).replaceChildren(...values.map(([value, label]) => {
+    const input = h('input', { type: 'radio', name: id, value });
+    input.checked = albumDraft[field] === value;
+    input.addEventListener('change', () => {
+      albumDraft[field] = value;
+      updateAlbumPreview();
+    });
+    return h('label', {}, input, label);
+  }));
+}
+
+function updateAlbumPreview() {
+  albumPreview?.destroy();
+  albumPreview = null;
+  const box = $('album-preview');
+  box.replaceChildren();
+  const items = draftFiles();
+  if (!items.length) {
+    box.append(h('p', { class: 'preview-empty' }, t('album.needItems')));
+    return;
+  }
+  // Faster than real life, so the preview shows the album taking turns.
+  albumPreview = mountAlbum(box, { ...albumDraft, items, interval: Math.min(albumDraft.interval, 4) }, convertFileSrc);
+}
+
+function buildAlbumPicker() {
+  const picker = $('album-picker');
+  if (!state.files.length) {
+    picker.replaceChildren(h('p', { class: 'empty' }, t('album.noFiles')));
+    return;
+  }
+  picker.replaceChildren(...state.files.map((file) => {
+    const button = h('button', {
+      class: 'pick',
+      title: file.name,
+      onclick: () => {
+        const at = albumDraft.items.indexOf(file.name);
+        if (at >= 0) albumDraft.items.splice(at, 1);
+        else albumDraft.items.push(file.name);
+        renderAlbumEditor();
+      },
+    }, h('span', { class: 'pick-media' }, thumbnail(file)), h('span', { class: 'pick-name' }, file.name));
+    button.dataset.name = file.name;
+    return button;
+  }));
+}
+
+function renderAlbumEditor() {
+  albumDraft.items = albumDraft.items.filter((name) => state.files.some((f) => f.name === name));
+  for (const button of $('album-picker').querySelectorAll('.pick')) {
+    const at = albumDraft.items.indexOf(button.dataset.name);
+    button.setAttribute('aria-pressed', String(at >= 0));
+    button.querySelector('.pick-number')?.remove();
+    if (at >= 0) button.append(h('span', { class: 'pick-number', 'aria-hidden': 'true' }, String(at + 1)));
+  }
+  $('album-count').textContent = t('album.count', { n: albumDraft.items.length });
+  $('album-use').disabled = !albumDraft.items.length;
+  choiceGroup('album-layout', 'layout', [['single', t('album.single')], ['collage', t('album.collage')]]);
+  choiceGroup('album-order', 'order', [['inorder', t('album.inOrder')], ['shuffle', t('album.shuffle')]]);
+  updateAlbumPreview();
+}
+
+$('album-name').addEventListener('input', () => (albumDraft.name = $('album-name').value));
+$('album-interval').addEventListener('change', () => {
+  albumDraft.interval = Number($('album-interval').value);
+  updateAlbumPreview();
+});
+$('album-cancel').addEventListener('click', closeAlbumEditor);
+$('album-use').addEventListener('click', async () => {
+  albumDraft.name = $('album-name').value.trim() || t('album.defaultName');
+  const id = await run('album_save', { album: albumDraft }).catch(() => null);
+  if (!id) return;
+  closeAlbumEditor();
+  await load();
+  await choose({ kind: 'album', id });
+});
+$('album-delete').addEventListener('click', async () => {
+  await run('album_delete', { id: albumDraft.id }).catch(() => {});
+  closeAlbumEditor();
+  await load();
+});
+
+// ---- drag & drop ----
+
+/** Mod folders on the Mods page; videos and images everywhere else. */
+const dropTarget = () => ($('page-mods').hidden ? 'wallpapers' : 'mods');
+
+let resultTimer;
+function showResult(text, warn = false) {
+  const bar = $('drop-result');
+  bar.className = `infobar ${warn ? 'caution' : 'success'}`;
+  bar.querySelector('span').textContent = text;
+  bar.hidden = false;
+  clearTimeout(resultTimer);
+  resultTimer = setTimeout(() => (bar.hidden = true), 10_000);
+}
+
+async function importDrop() {
+  const target = dropTarget();
+  showResult(t('drop.adding'));
+  let result;
+  try {
+    result = await run('drop_import', { target });
+  } catch {
+    $('drop-result').hidden = true;
+    return;
+  }
+  const [added, skipped] = [result.added.length, result.skipped.length];
+  const mods = target === 'mods';
+  const parts = [
+    added && t(mods ? 'drop.modsAdded' : 'drop.added', { n: added }),
+    skipped && t(mods ? 'drop.skippedMods' : 'drop.skippedFiles', { n: skipped }),
+  ].filter(Boolean);
+  showResult(parts.join(' '), !added);
+  if (!mods && $('page-wallpaper').hidden) show('wallpaper');
+  await load();
+  if (albumDraft && !mods) {
+    for (const name of result.added) if (!albumDraft.items.includes(name)) albumDraft.items.push(name);
+    buildAlbumPicker();
+    renderAlbumEditor();
+  }
+}
+
+await getCurrentWebview().onDragDropEvent(({ payload }) => {
+  const overlay = $('drop-overlay');
+  if (payload.type === 'enter') {
+    $('drop-text').textContent = t(dropTarget() === 'mods' ? 'drop.mods' : albumDraft ? 'drop.album' : 'drop.files');
+    overlay.hidden = false;
+  } else if (payload.type === 'leave') {
+    overlay.hidden = true;
+  } else if (payload.type === 'drop') {
+    overlay.hidden = true;
+    importDrop();
+  }
+});
+
 // ---- widgets ----
 
 function renderWidgets() {
@@ -427,13 +629,38 @@ function renderGeneral() {
   $('autostart-toggle').replaceChildren(switchControl(state.autostart, t('startup.title'), (input) => {
     run('set_autostart', { on: input.checked }).catch(() => (input.checked = !input.checked));
   }));
-  $('pause-options').replaceChildren(...PAUSE_OPTIONS.map(([key, iconName]) => h('div', { class: 'row' },
+  // On a Mac, "covered" and "fullscreen" are one signal: whether the wallpaper is visible.
+  const pauseOptions = PAUSE_OPTIONS.filter(([key]) => !(state.platform === 'macos' && key === 'covered'));
+  $('pause-options').replaceChildren(...pauseOptions.map(([key, iconName]) => h('div', { class: 'row' },
     icon(iconName, 'icon row-icon'),
     h('div', { class: 'row-text' }, h('div', {}, t(`pause.${key}`)), h('div', { class: 'row-desc' }, t(`pause.${key}Text`))),
     switchControl(state.pause[key], t(`pause.${key}`), (input) => {
       state.pause[key] = input.checked;
+      if (state.platform === 'macos' && key === 'fullscreen') state.pause.covered = input.checked;
       run('set_pause_options', { options: state.pause }).catch(() => {});
     }))));
+  renderAwake();
+}
+
+function renderAwake() {
+  const mac = state.platform === 'macos';
+  $('awake-section').hidden = !mac;
+  if (!mac) return;
+  $('awake-options').replaceChildren(...AWAKE.map(([mode, iconName]) => {
+    const input = h('input', { type: 'radio', name: 'awake', value: mode });
+    input.checked = state.keepAwake === mode;
+    input.addEventListener('change', async () => {
+      try {
+        await run('set_keep_awake', { mode });
+        state.keepAwake = mode;
+      } catch {
+        renderAwake();
+      }
+    });
+    return h('label', { class: 'row choice' }, icon(iconName, 'icon row-icon'),
+      h('div', { class: 'row-text' }, h('div', {}, t(`awake.${mode}`)), h('div', { class: 'row-desc' }, t(`awake.${mode}Text`))),
+      input);
+  }));
 }
 
 // ---- privacy & about ----
@@ -490,4 +717,9 @@ for (const [id, on] of [['startup-yes', true], ['startup-no', false]]) {
 addEventListener('resize', renderMonitors);
 await listen('theme', (event) => applyAccent(event.payload));
 await listen('language', () => load());
+await listen('keep-awake', (event) => {
+  if (!state) return;
+  state.keepAwake = event.payload;
+  renderAwake();
+});
 await load();

@@ -2,8 +2,9 @@
 
 use std::path::Path;
 
-/// Origin of the `dwmod` custom protocol as WebView2 sees it.
-pub const MOD_ORIGIN: &str = "http://dwmod.localhost";
+/// Where Tauri serves the `dwmod` protocol: WebView2 (Windows) uses `http://<scheme>.localhost`,
+/// WebKit (macOS) uses `<scheme>://localhost`.
+pub const MOD_ORIGIN: &str = if cfg!(windows) { "http://dwmod.localhost" } else { "dwmod://localhost" };
 
 /// CSP for every file of mod `id`: only its own folder and the SDK, no network, and the
 /// document is sandboxed even if something loads it outside our sandboxed iframe.
@@ -65,7 +66,7 @@ mod tests {
     fn csp_confines_mod_to_its_folder() {
         let csp = mod_csp("acme.clock");
         assert!(csp.contains("connect-src 'none'"));
-        assert!(csp.contains("script-src http://dwmod.localhost/acme.clock/ http://dwmod.localhost/_sdk/;"));
+        assert!(csp.contains(&format!("script-src {MOD_ORIGIN}/acme.clock/ {MOD_ORIGIN}/_sdk/;")));
         assert!(csp.ends_with("sandbox allow-scripts"));
         assert!(!csp.contains("unsafe-eval") && !csp.contains("script-src 'self'"));
     }

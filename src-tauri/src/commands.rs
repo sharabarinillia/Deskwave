@@ -2,28 +2,25 @@
 //! Every argument comes from a page that hosts untrusted mods, so it is validated here.
 
 use crate::broker;
-use crate::desktop::{self, Power};
 use crate::layers::{self, label};
 use crate::media::{Action, NowPlaying};
+use crate::platform::{self, Power};
 use crate::state::{AppState, Monitor, NetEvent, DEFAULT_WALLPAPER};
 use crate::stats::Stats;
-use deskwave_core::config::{new_widget_id, Gradient, Grant, PauseOptions, Wallpaper, Widget, MAX_GRADIENTS};
+use deskwave_core::config::{
+    new_widget_id, Album, AlbumLayout, AlbumOrder, Config, Gradient, Grant, KeepAwake, PauseOptions, Wallpaper,
+    Widget, MAX_ALBUMS, MAX_GRADIENTS,
+};
+use deskwave_core::files::{self, Imported};
 use deskwave_core::manifest::{InstalledMod, Kind, Permission};
 use deskwave_core::sandbox::MOD_ORIGIN;
 use deskwave_core::storage;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::sync::atomic::Ordering::SeqCst;
-use tauri::{AppHandle, Emitter, State, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 
 type Res<T> = Result<T, String>;
-
-const VIDEO: &[&str] = &["mp4", "webm"];
-const IMAGE: &[&str] = &["gif", "png", "apng", "jpg", "jpeg", "webp", "avif"];
-
-fn ext(name: &str) -> String {
-    name.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase()).unwrap_or_default()
-}
 
 fn monitor_of(state: &AppState, window: &WebviewWindow) -> Res<(usize, Monitor)> {
     let i = layers::monitor_index(state, window.label()).ok_or("stale window")?;
@@ -37,22 +34,35 @@ fn mod_url(m: &InstalledMod) -> String {
 
 /// Video and image files directly inside the wallpapers folder.
 fn wallpaper_files(state: &AppState) -> Vec<String> {
-    let mut names: Vec<String> = std::fs::read_dir(&state.paths.wallpapers)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .filter(|e| e.path().is_file())
-        .filter_map(|e| e.file_name().into_string().ok())
-        .filter(|n| {
-            let e = ext(n);
-            VIDEO.contains(&e.as_str()) || IMAGE.contains(&e.as_str())
-        })
-        .collect();
-    names.sort();
-    names
+    files::media_files(&state.paths.wallpapers)
+}
+
+/// A file in the wallpapers folder; the pages load it via the asset protocol.
+#[derive(Serialize)]
+pub struct MediaFile {
+    name: String,
+    path: String,
+    video: bool,
+}
+
+fn media_file(state: &AppState, name: &str) -> MediaFile {
+    MediaFile {
+        name: name.to_owned(),
+        path: state.paths.wallpapers.join(name).to_string_lossy().into_owned(),
+        video: files::is_video(name),
+    }
 }
 
 // ---- wallpaper window ----
+
+/// An album as the wallpaper plays it: only files that still exist.
+#[derive(Serialize)]
+pub struct AlbumView {
+    items: Vec<MediaFile>,
+    interval: u32,
+    order: AlbumOrder,
+    layout: AlbumLayout,
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -62,47 +72,54 @@ pub struct WallpaperInfo {
     file: Option<String>,
     video: bool,
     gradient: Option<Gradient>,
+    album: Option<AlbumView>,
     paused: bool,
     accent: String,
     lang: &'static str,
 }
 
+fn album_view(state: &AppState, config: &Config, id: &str) -> Option<AlbumView> {
+    let album = config.albums.iter().find(|a| a.id == id)?;
+    let available = wallpaper_files(state);
+    let items: Vec<MediaFile> =
+        album.items.iter().filter(|n| available.contains(n)).map(|n| media_file(state, n)).collect();
+    (!items.is_empty()).then_some(AlbumView { items, interval: album.interval, order: album.order, layout: album.layout })
+}
+
 #[tauri::command]
 pub fn wallpaper_get(window: WebviewWindow, state: State<AppState>) -> Res<WallpaperInfo> {
     let (i, monitor) = monitor_of(&state, &window)?;
-    let chosen = state.config.lock().unwrap().wallpapers.get(&monitor.key).cloned();
+    let config = state.config.lock().unwrap().clone();
+    let chosen = config.wallpapers.get(&monitor.key).cloned();
     let mut info = WallpaperInfo {
         mod_url: None,
         file: None,
         video: false,
         gradient: None,
+        album: None,
         paused: state.paused.lock().unwrap().get(i).copied().unwrap_or(false),
-        accent: desktop::accent_color(),
+        accent: platform::accent_color(),
         lang: state.lang(),
     };
-    let gradient = match &chosen {
-        Some(Wallpaper::Gradient { id }) => state.config.lock().unwrap().gradients.iter().find(|g| &g.id == id).cloned(),
-        _ => None,
-    };
-    if gradient.is_some() {
-        info.gradient = gradient;
-        return Ok(info);
+    // A gradient, album or file that no longer exists falls back to the chosen or default mod.
+    match &chosen {
+        Some(Wallpaper::Gradient { id }) => info.gradient = config.gradients.iter().find(|g| &g.id == id).cloned(),
+        Some(Wallpaper::Album { id }) => info.album = album_view(&state, &config, id),
+        Some(Wallpaper::File { name }) if wallpaper_files(&state).contains(name) => {
+            info.video = files::is_video(name);
+            info.file = Some(media_file(&state, name).path);
+        }
+        _ => {}
     }
-    match chosen {
-        Some(Wallpaper::File { name }) if wallpaper_files(&state).contains(&name) => {
-            info.video = VIDEO.contains(&ext(&name).as_str());
-            info.file = Some(state.paths.wallpapers.join(name).to_string_lossy().into_owned());
-        }
-        chosen => {
-            let id = match &chosen {
-                Some(Wallpaper::Mod { id }) => id.as_str(),
-                _ => DEFAULT_WALLPAPER,
-            };
-            info.mod_url = state
-                .ready_kind(id, Kind::Wallpaper)
-                .or_else(|| state.ready_kind(DEFAULT_WALLPAPER, Kind::Wallpaper))
-                .map(|m| mod_url(&m));
-        }
+    if info.gradient.is_none() && info.album.is_none() && info.file.is_none() {
+        let id = match &chosen {
+            Some(Wallpaper::Mod { id }) => id.as_str(),
+            _ => DEFAULT_WALLPAPER,
+        };
+        info.mod_url = state
+            .ready_kind(id, Kind::Wallpaper)
+            .or_else(|| state.ready_kind(DEFAULT_WALLPAPER, Kind::Wallpaper))
+            .map(|m| mod_url(&m));
     }
     Ok(info)
 }
@@ -169,6 +186,8 @@ fn widgets_info(state: &AppState, monitor: &str) -> WidgetsInfo {
     let available = installed
         .iter()
         .filter(|m| state.ready_kind(&m.manifest.id, Kind::Widget).is_some())
+        // macOS has no Now playing source, so media widgets would only ever show "nothing".
+        .filter(|m| platform::MEDIA || !m.manifest.permissions.contains(&Permission::Media))
         .map(|m| ModChoice {
             id: m.manifest.id.clone(),
             name: m.manifest.name_in(lang).to_owned(),
@@ -179,7 +198,7 @@ fn widgets_info(state: &AppState, monitor: &str) -> WidgetsInfo {
         widgets,
         available,
         editing: state.editing.load(SeqCst),
-        accent: desktop::accent_color(),
+        accent: platform::accent_color(),
         lang,
     }
 }
@@ -294,7 +313,7 @@ pub fn storage_set(state: State<AppState>, widget: String, key: String, value: V
 
 #[tauri::command]
 pub fn battery_get() -> Power {
-    desktop::power()
+    platform::power()
 }
 
 /// The mod behind a request: a widget on the calling layer, or the calling wallpaper's mod.
@@ -418,17 +437,20 @@ pub struct SettingsInfo {
     monitors: Vec<MonitorInfo>,
     mods: Vec<ModInfo>,
     errors: Vec<String>,
-    files: Vec<String>,
-    wallpapers_dir: String,
+    files: Vec<MediaFile>,
     widget_count: usize,
     accent: String,
     internet: bool,
     autostart: bool,
     startup_asked: bool,
-    /// The language in use, and the user's choice (`None` = follow Windows).
+    /// The language in use, and the user's choice (`None` = follow the system).
     lang: &'static str,
     language: Option<String>,
     gradients: Vec<Gradient>,
+    albums: Vec<Album>,
+    keep_awake: KeepAwake,
+    /// `windows` or `macos`; the page adapts its wording and options.
+    platform: &'static str,
     /// Newest first.
     net_log: Vec<NetEvent>,
     version: &'static str,
@@ -479,16 +501,18 @@ pub fn settings_get(state: State<AppState>) -> SettingsInfo {
             })
             .collect(),
         errors: mods.errors.clone(),
-        files: wallpaper_files(&state),
-        wallpapers_dir: state.paths.wallpapers.to_string_lossy().into_owned(),
+        files: wallpaper_files(&state).iter().map(|n| media_file(&state, n)).collect(),
         widget_count: config.widgets.len(),
-        accent: desktop::accent_color(),
+        accent: platform::accent_color(),
         internet: config.internet,
-        autostart: desktop::autostart_enabled(),
+        autostart: platform::autostart_enabled(),
         startup_asked: config.startup_asked,
         lang: state.lang(),
         language: config.language.clone(),
         gradients: config.gradients.clone(),
+        albums: config.albums.clone(),
+        keep_awake: config.keep_awake,
+        platform: platform::PLATFORM,
         net_log: state.net_log.lock().unwrap().iter().rev().cloned().collect(),
         version: env!("CARGO_PKG_VERSION"),
     }
@@ -500,6 +524,7 @@ pub fn set_wallpaper(app: AppHandle, state: State<AppState>, monitor: String, wa
         Wallpaper::Mod { id } => state.ready_kind(id, Kind::Wallpaper).is_some(),
         Wallpaper::File { name } => wallpaper_files(&state).contains(name),
         Wallpaper::Gradient { id } => state.config.lock().unwrap().gradients.iter().any(|g| &g.id == id),
+        Wallpaper::Album { id } => state.config.lock().unwrap().albums.iter().any(|a| &a.id == id),
     };
     let index = state.monitors.lock().unwrap().iter().position(|m| m.key == monitor);
     let (true, Some(index)) = (valid, index) else {
@@ -578,6 +603,98 @@ pub fn gradient_delete(app: AppHandle, state: State<AppState>, id: String) {
     let _ = app.emit("wallpaper-changed", ());
 }
 
+/// Creates or updates an album; returns its id. Files no longer in the wallpapers folder
+/// are dropped from it.
+#[tauri::command]
+pub fn album_save(app: AppHandle, state: State<AppState>, mut album: Album) -> Res<String> {
+    if album.id.is_empty() {
+        album.id = new_widget_id();
+    }
+    album.name = album.name.trim().to_owned();
+    let available = wallpaper_files(&state);
+    album.items.retain(|n| available.contains(n));
+    if !album.valid() {
+        return Err("invalid album".into());
+    }
+    let mut config = state.config.lock().unwrap();
+    match config.albums.iter().position(|a| a.id == album.id) {
+        Some(i) => config.albums[i] = album.clone(),
+        None if config.albums.len() >= MAX_ALBUMS => return Err("too many albums".into()),
+        None => config.albums.push(album.clone()),
+    }
+    drop(config);
+    state.save();
+    // Displays already showing this album pick up the changes.
+    let _ = app.emit("wallpaper-changed", ());
+    Ok(album.id)
+}
+
+/// Deletes an album (not its files); displays that used it go back to the default wallpaper.
+#[tauri::command]
+pub fn album_delete(app: AppHandle, state: State<AppState>, id: String) {
+    {
+        let mut config = state.config.lock().unwrap();
+        config.albums.retain(|a| a.id != id);
+        for wallpaper in config.wallpapers.values_mut() {
+            if matches!(wallpaper, Wallpaper::Album { id: used } if *used == id) {
+                *wallpaper = Wallpaper::Mod { id: DEFAULT_WALLPAPER.into() };
+            }
+        }
+    }
+    state.save();
+    let _ = app.emit("wallpaper-changed", ());
+}
+
+/// Imports what the user just dropped onto Settings: videos and images into the wallpapers
+/// folder, or mod folders into the mods folder. The paths come from the drop event itself
+/// (see `layers::on_window_event`), never from the page.
+#[tauri::command]
+pub async fn drop_import(state: State<'_, AppState>, target: String) -> Res<Imported> {
+    let (paths, when) = state.dropped.lock().unwrap().take().ok_or("nothing was dropped")?;
+    if when.elapsed().as_secs() > 60 {
+        return Err("nothing was dropped".into());
+    }
+    let (dir, mods) = match target.as_str() {
+        "wallpapers" => (state.paths.wallpapers.clone(), false),
+        "mods" => (state.paths.mods.clone(), true),
+        _ => return Err("unknown target".into()),
+    };
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let paths = &paths[..paths.len().min(500)];
+        if mods {
+            files::import_mods(paths, &dir)
+        } else {
+            files::import_media(paths, &dir)
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    if mods && !result.added.is_empty() {
+        state.rescan_mods();
+    }
+    Ok(result)
+}
+
+/// Turns keeping awake on or off and remembers it; shared by Settings and the tray menu.
+pub fn apply_keep_awake(app: &AppHandle, mode: KeepAwake) -> Res<()> {
+    platform::set_keep_awake(mode)?;
+    let state = app.state::<AppState>();
+    state.config.lock().unwrap().keep_awake = mode;
+    state.save();
+    crate::tray::refresh(app);
+    let _ = app.emit("keep-awake", mode);
+    Ok(())
+}
+
+/// macOS only: keeps the screen, or just the Mac, from going to sleep.
+#[tauri::command]
+pub fn set_keep_awake(app: AppHandle, mode: KeepAwake) -> Res<()> {
+    if platform::PLATFORM != "macos" {
+        return Err("keeping awake is a macOS feature".into());
+    }
+    apply_keep_awake(&app, mode)
+}
+
 /// Only these addresses can be opened, so the page cannot launch arbitrary URLs.
 #[tauri::command]
 pub fn open_link(which: String) -> Res<()> {
@@ -587,7 +704,7 @@ pub fn open_link(which: String) -> Res<()> {
         "license" => "https://polyformproject.org/licenses/noncommercial/1.0.0",
         _ => return Err("unknown link".into()),
     };
-    desktop::open_url(url);
+    platform::open_url(url);
     Ok(())
 }
 
@@ -600,7 +717,7 @@ pub fn set_internet(app: AppHandle, state: State<AppState>, on: bool) {
 
 #[tauri::command]
 pub fn set_autostart(state: State<AppState>, on: bool) -> Res<()> {
-    desktop::set_autostart(on)?;
+    platform::set_autostart(on)?;
     state.config.lock().unwrap().startup_asked = true;
     state.save();
     Ok(())
@@ -619,5 +736,5 @@ pub fn open_folder(state: State<AppState>, which: String) -> Res<()> {
         "wallpapers" => &state.paths.wallpapers,
         _ => return Err("unknown folder".into()),
     };
-    std::process::Command::new("explorer.exe").arg(dir).spawn().map(drop).map_err(|e| e.to_string())
+    platform::open_folder(dir)
 }

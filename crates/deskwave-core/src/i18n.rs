@@ -4,7 +4,7 @@
 /// English first: it is the fallback.
 pub const LANGUAGES: [&str; 7] = ["en", "uk", "fr", "nl", "de", "pl", "es"];
 
-/// The user's choice if supported, else the first supported Windows display language
+/// The user's choice if supported, else the first supported system display language
 /// (`uk-UA` → `uk`), else English.
 pub fn resolve(chosen: Option<&str>, system: &[String]) -> &'static str {
     let supported = |code: &str| LANGUAGES.iter().copied().find(|l| l.eq_ignore_ascii_case(code));
@@ -19,19 +19,21 @@ pub struct TrayText {
     pub pause: &'static str,
     pub open: &'static str,
     pub quit: &'static str,
+    /// macOS only: keeps the screen (or the Mac) awake.
+    pub awake: &'static str,
 }
 
 pub fn tray(lang: &str) -> TrayText {
-    let (edit, pause, open, quit) = match lang {
-        "uk" => ("Редагувати віджети", "Призупинити анімацію", "Відкрити Deskwave", "Вийти з Deskwave"),
-        "fr" => ("Modifier les widgets", "Mettre les animations en pause", "Ouvrir Deskwave", "Quitter Deskwave"),
-        "nl" => ("Widgets bewerken", "Animaties pauzeren", "Deskwave openen", "Deskwave afsluiten"),
-        "de" => ("Widgets bearbeiten", "Animationen anhalten", "Deskwave öffnen", "Deskwave beenden"),
-        "pl" => ("Edytuj widżety", "Wstrzymaj animacje", "Otwórz Deskwave", "Zamknij Deskwave"),
-        "es" => ("Editar widgets", "Pausar animaciones", "Abrir Deskwave", "Salir de Deskwave"),
-        _ => ("Edit widgets", "Pause animations", "Open Deskwave", "Quit Deskwave"),
+    let (edit, pause, open, quit, awake) = match lang {
+        "uk" => ("Редагувати віджети", "Призупинити анімацію", "Відкрити Deskwave", "Вийти з Deskwave", "Не вимикати екран"),
+        "fr" => ("Modifier les widgets", "Mettre les animations en pause", "Ouvrir Deskwave", "Quitter Deskwave", "Garder l\u{2019}écran allumé"),
+        "nl" => ("Widgets bewerken", "Animaties pauzeren", "Deskwave openen", "Deskwave afsluiten", "Scherm aan houden"),
+        "de" => ("Widgets bearbeiten", "Animationen anhalten", "Deskwave öffnen", "Deskwave beenden", "Bildschirm wach halten"),
+        "pl" => ("Edytuj widżety", "Wstrzymaj animacje", "Otwórz Deskwave", "Zamknij Deskwave", "Nie wyłączaj ekranu"),
+        "es" => ("Editar widgets", "Pausar animaciones", "Abrir Deskwave", "Salir de Deskwave", "Mantener la pantalla encendida"),
+        _ => ("Edit widgets", "Pause animations", "Open Deskwave", "Quit Deskwave", "Keep screen awake"),
     };
-    TrayText { edit, pause, open, quit }
+    TrayText { edit, pause, open, quit, awake }
 }
 
 #[cfg(test)]
@@ -52,7 +54,7 @@ mod tests {
     fn every_language_has_tray_text() {
         for lang in LANGUAGES {
             let text = tray(lang);
-            assert!(!text.edit.is_empty() && !text.quit.is_empty());
+            assert!(!text.edit.is_empty() && !text.quit.is_empty() && !text.awake.is_empty());
             assert!(lang == "en" || text.edit != tray("en").edit, "{lang} falls back to English");
         }
     }

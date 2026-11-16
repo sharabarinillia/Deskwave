@@ -1,3 +1,4 @@
+import { mountAlbum } from './album.js';
 import { mountMod } from './bridge.js';
 import { mountGradient } from './gradient.js';
 import { setLang } from './i18n.js';
@@ -11,9 +12,11 @@ let paused = false;
 
 function setPaused(value) {
   paused = value;
-  const { media, mod, gradient } = current;
-  if (paused) gradient?.pause();
-  else gradient?.resume();
+  const { media, mod, gradient, album } = current;
+  for (const player of [gradient, album]) {
+    if (paused) player?.pause();
+    else player?.resume();
+  }
   if (media instanceof HTMLVideoElement) {
     if (paused) media.pause();
     else media.play().catch(() => {});
@@ -26,10 +29,13 @@ async function load() {
   const info = await invoke('wallpaper_get');
   setLang(info.lang);
   current.gradient?.destroy();
+  current.album?.destroy();
   stage.replaceChildren();
   current = {};
   if (info.gradient) {
     current = { gradient: mountGradient(stage, info.gradient) };
+  } else if (info.album) {
+    current = { album: mountAlbum(stage, info.album, convertFileSrc) };
   } else if (info.file) {
     const media = document.createElement(info.video ? 'video' : 'img');
     if (info.video) Object.assign(media, { muted: true, loop: true, playsInline: true });

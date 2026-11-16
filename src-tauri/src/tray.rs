@@ -1,5 +1,6 @@
 use crate::layers;
 use crate::state::AppState;
+use deskwave_core::config::KeepAwake;
 use deskwave_core::i18n;
 use std::sync::atomic::Ordering::SeqCst;
 use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
@@ -10,16 +11,21 @@ fn menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let state = app.state::<AppState>();
     let text = i18n::tray(state.lang());
     let paused = state.user_paused.load(SeqCst);
-    Menu::with_items(
+    let menu = Menu::with_items(
         app,
         &[
             &MenuItem::with_id(app, "open", text.open, true, None::<&str>)?,
             &MenuItem::with_id(app, "edit", text.edit, true, None::<&str>)?,
             &CheckMenuItem::with_id(app, "pause", text.pause, true, paused, None::<&str>)?,
-            &PredefinedMenuItem::separator(app)?,
-            &MenuItem::with_id(app, "quit", text.quit, true, None::<&str>)?,
         ],
-    )
+    )?;
+    if crate::platform::PLATFORM == "macos" {
+        let awake = state.config.lock().unwrap().keep_awake != KeepAwake::Off;
+        menu.append(&CheckMenuItem::with_id(app, "awake", text.awake, true, awake, None::<&str>)?)?;
+    }
+    menu.append(&PredefinedMenuItem::separator(app)?)?;
+    menu.append(&MenuItem::with_id(app, "quit", text.quit, true, None::<&str>)?)?;
+    Ok(menu)
 }
 
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
@@ -27,6 +33,14 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .tooltip("Deskwave")
         .menu(&menu(app)?)
         .show_menu_on_left_click(false);
+    // macOS: a one-color template image, so the menu bar can tint it for light and dark mode.
+    #[cfg(target_os = "macos")]
+    {
+        // 44×44 RGBA, rendered from icons/tray-template.svg.
+        let icon = tauri::image::Image::new(include_bytes!("../icons/tray-template.rgba"), 44, 44);
+        tray = tray.icon(icon).icon_as_template(true);
+    }
+    #[cfg(not(target_os = "macos"))]
     if let Some(icon) = app.default_window_icon() {
         tray = tray.icon(icon.clone());
     }
@@ -35,6 +49,11 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         "edit" => layers::set_editing(app, true),
         "pause" => {
             app.state::<AppState>().user_paused.fetch_xor(true, SeqCst);
+        }
+        "awake" => {
+            let on = app.state::<AppState>().config.lock().unwrap().keep_awake != KeepAwake::Off;
+            let mode = if on { KeepAwake::Off } else { KeepAwake::Screen };
+            let _ = crate::commands::apply_keep_awake(app, mode);
         }
         "quit" => app.exit(0),
         _ => {}

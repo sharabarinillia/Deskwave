@@ -1,7 +1,10 @@
-//! Win32: putting windows into the desktop, and reading the system state used for pausing.
+//! Windows: putting windows into the desktop, and reading the system state used for pausing.
 //! The desktop window tree is undocumented; see docs/SPEC.md, "Desktop integration".
 
-use serde::Serialize;
+use super::{Coverage, Power, BACKGROUND_FLAG};
+use crate::state::Monitor;
+use deskwave_core::config::KeepAwake;
+use tauri::{AppHandle, WebviewWindow};
 use windows::core::{w, BOOL, PCWSTR};
 use windows::Win32::Foundation::{
     CloseHandle, GetLastError, COLORREF, ERROR_ALREADY_EXISTS, ERROR_FILE_NOT_FOUND, ERROR_SUCCESS,
@@ -26,6 +29,10 @@ use windows::Win32::System::Threading::{
 };
 use windows::Win32::UI::WindowsAndMessaging::*;
 
+pub const PLATFORM: &str = "windows";
+/// The Now playing widget reads the Windows media session.
+pub const MEDIA: bool = true;
+
 /// Window handles cross threads as plain integers.
 pub type Hwnd = isize;
 
@@ -33,10 +40,16 @@ fn hwnd(h: Hwnd) -> HWND {
     HWND(h as *mut _)
 }
 
+fn hwnd_of(window: &WebviewWindow) -> Option<Hwnd> {
+    window.hwnd().ok().map(|h| h.0 as Hwnd)
+}
+
+/// The event a later launch signals to ask this one to show Settings (0 if it couldn't be made).
+pub struct Instance(Hwnd);
+
 /// `None` if Deskwave is already running; that copy is then asked to open Settings.
-/// Otherwise the handle of the event a later launch will signal (0 if it couldn't be made).
 /// The mutex lives until the process exits.
-pub fn single_instance() -> Option<Hwnd> {
+pub fn single_instance() -> Option<Instance> {
     unsafe {
         let created = CreateMutexW(None, true, w!("Local\\Deskwave.SingleInstance"));
         if created.is_err() || GetLastError() == ERROR_ALREADY_EXISTS {
@@ -47,13 +60,15 @@ pub fn single_instance() -> Option<Hwnd> {
             return None;
         }
         let event = CreateEventW(None, false, false, w!("Local\\Deskwave.ShowSettings"));
-        Some(event.map_or(0, |h| h.0 as Hwnd))
+        Some(Instance(event.map_or(0, |h| h.0 as Hwnd)))
     }
 }
 
-/// True once each time another launch asked us to show Settings.
-pub fn take_show_request(event: Hwnd) -> bool {
-    event != 0 && unsafe { WaitForSingleObject(HANDLE(event as *mut _), 0) == WAIT_OBJECT_0 }
+impl Instance {
+    /// True once each time another launch asked us to show Settings.
+    pub fn take_show_request(&self) -> bool {
+        self.0 != 0 && unsafe { WaitForSingleObject(HANDLE(self.0 as *mut _), 0) == WAIT_OBJECT_0 }
+    }
 }
 
 const RUN_KEY: PCWSTR = w!("Software\\Microsoft\\Windows\\CurrentVersion\\Run");
@@ -98,8 +113,23 @@ pub fn open_url(url: &str) {
     }
 }
 
-/// Passed by the sign-in entry so that start stays quiet; a normal launch opens the window.
-pub const BACKGROUND_FLAG: &str = "--background";
+/// Shows one of Deskwave's own folders in File Explorer.
+pub fn open_folder(dir: &std::path::Path) -> Result<(), String> {
+    std::process::Command::new("explorer.exe").arg(dir).spawn().map(drop).map_err(|e| e.to_string())
+}
+
+/// WebView2 gets its hardening from the browser arguments (`sandbox::BROWSER_ARGS`).
+pub fn harden_webview(_window: &WebviewWindow) {}
+
+/// Keeping awake is a macOS feature; Windows has its own power settings for this.
+pub fn set_keep_awake(_mode: KeepAwake) -> Result<(), String> {
+    Ok(())
+}
+
+/// Seconds since the last keyboard or mouse input; only used on macOS.
+pub fn idle_seconds() -> u64 {
+    0
+}
 
 /// Adds or removes Deskwave from the current user's sign-in programs.
 pub fn set_autostart(on: bool) -> Result<(), String> {
@@ -157,9 +187,38 @@ pub fn desktop_owner() -> Option<Hwnd> {
     icons_host().map(|h| h.0 as Hwnd)
 }
 
+fn rect_of(m: &Monitor) -> RECT {
+    RECT { left: m.rect.0, top: m.rect.1, right: m.rect.0 + m.rect.2 as i32, bottom: m.rect.1 + m.rect.3 as i32 }
+}
+
+/// Puts a new wallpaper window into the desktop, below the icons, covering monitor `m`.
+/// Shown via Win32: tao's show() would restore the popup styles.
+pub fn place_wallpaper(window: &WebviewWindow, m: &Monitor) -> Result<(), String> {
+    let handle = hwnd_of(window).ok_or("no window handle")?;
+    attach_wallpaper(handle, rect_of(m)).map(drop)
+}
+
+/// Shows a new widget layer above the wallpaper and below other apps.
+pub fn place_widgets(window: &WebviewWindow, owner: Option<Hwnd>) -> tauri::Result<()> {
+    if let (Some(owner), Some(handle)) = (owner, hwnd_of(window)) {
+        set_owner(handle, owner);
+    }
+    window.show()?;
+    sink(window, owner);
+    Ok(())
+}
+
+/// Edit mode lifts a widget layer above all windows; leaving it sinks the layer back.
+pub fn set_editing(window: &WebviewWindow, on: bool, owner: Option<Hwnd>) {
+    let _ = window.set_always_on_top(on);
+    if !on {
+        sink(window, owner);
+    }
+}
+
 /// Parents `window` into the desktop below the icons and stretches it over `rect` (physical
 /// screen pixels). Returns the parent so the caller can notice when Explorer restarts.
-pub fn attach_wallpaper(window: Hwnd, rect: RECT) -> Result<Hwnd, String> {
+fn attach_wallpaper(window: Hwnd, rect: RECT) -> Result<Hwnd, String> {
     let window = hwnd(window);
     let progman = progman().ok_or("Progman not found")?;
     unsafe {
@@ -249,14 +308,20 @@ fn raised(progman: HWND) -> bool {
 }
 
 /// Makes `owner` own `window`; owned windows stay above their owner and leave Alt+Tab.
-pub fn set_owner(window: Hwnd, owner: Hwnd) {
+fn set_owner(window: Hwnd, owner: Hwnd) {
     unsafe {
         SetWindowLongPtrW(hwnd(window), GWLP_HWNDPARENT, owner);
     }
 }
 
-/// Moves `window` back down to just above the desktop, without taking focus away.
-pub fn sink(window: Hwnd, owner: Hwnd) {
+/// Moves a widget layer back down to just above the desktop, without taking focus away.
+pub fn sink(window: &WebviewWindow, owner: Option<Hwnd>) {
+    if let (Some(owner), Some(handle)) = (owner, hwnd_of(window)) {
+        sink_hwnd(handle, owner);
+    }
+}
+
+fn sink_hwnd(window: Hwnd, owner: Hwnd) {
     unsafe {
         if let Ok(above_owner) = GetWindow(hwnd(owner), GW_HWNDPREV) {
             if above_owner != hwnd(window) {
@@ -296,12 +361,13 @@ pub fn repaint_static_wallpaper() {
     }
 }
 
-pub fn cursor_pos() -> (i32, i32) {
+/// Cursor position in physical screen pixels.
+pub fn cursor_pos(_app: &AppHandle) -> (f64, f64) {
     let mut p = POINT::default();
     unsafe {
         let _ = GetCursorPos(&mut p);
     }
-    (p.x, p.y)
+    (p.x as f64, p.y as f64)
 }
 
 /// Windows accent color as `#rrggbb` (stored as 0xAABBGGRR).
@@ -325,18 +391,6 @@ pub fn accent_color() -> String {
     }
     let [r, g, b, _] = value.to_le_bytes();
     format!("#{r:02x}{g:02x}{b:02x}")
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Power {
-    /// False on desktop PCs.
-    pub present: bool,
-    pub percent: Option<u8>,
-    pub charging: bool,
-    pub on_ac: bool,
-    pub saver: bool,
-    pub seconds_left: Option<u32>,
 }
 
 pub fn power() -> Power {
@@ -366,17 +420,14 @@ pub fn session_inactive() -> bool {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub struct Coverage {
-    /// A window covers the whole monitor (fullscreen game or video).
-    pub fullscreen: bool,
-    /// A maximized window is on the monitor.
-    pub maximized: bool,
-}
-
 /// What hides the wallpaper on each monitor. Skips our own windows, the shell desktop,
 /// minimized/cloaked windows and click-through/tool overlays (e.g. GPU driver overlays).
-pub fn coverage(monitors: &[RECT]) -> Vec<Coverage> {
+pub fn coverage(_app: &AppHandle, monitors: &[Monitor]) -> Vec<Coverage> {
+    let rects: Vec<RECT> = monitors.iter().map(rect_of).collect();
+    covering(&rects)
+}
+
+fn covering(monitors: &[RECT]) -> Vec<Coverage> {
     struct Ctx<'a> {
         monitors: &'a [RECT],
         out: Vec<Coverage>,

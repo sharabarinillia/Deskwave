@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-album-save"
+description = "Enables the album_save command without any pre-configured scope."
+commands.allow = ["album_save"]
+
+[[permission]]
+identifier = "deny-album-save"
+description = "Denies the album_save command without any pre-configured scope."
+commands.deny = ["album_save"]

@@ -26,6 +26,10 @@ fn main() {
         "set_language",
         "gradient_save",
         "gradient_delete",
+        "album_save",
+        "album_delete",
+        "drop_import",
+        "set_keep_awake",
         "open_link",
     ]);
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(commands))
